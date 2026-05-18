@@ -30,6 +30,7 @@ find_package(Qt6 6.2 REQUIRED COMPONENTS
 # ----------------------------------------------------------------------------
 set(VD_SOURCES
     src/main.cpp
+    src/CookiesPreparer.cpp
     src/DownloadManager.cpp
     src/DownloadQueueModel.cpp
     src/DownloadJob.cpp
@@ -40,6 +41,7 @@ set(VD_SOURCES
 )
 
 set(VD_HEADERS
+    src/CookiesPreparer.h
     src/DownloadManager.h
     src/DownloadQueueModel.h
     src/DownloadJob.h

@@ -15,6 +15,7 @@
         <file alias="components/SectionHeader.qml">../qml/components/SectionHeader.qml</file>
         <file alias="components/TextFieldA.qml">../qml/components/TextFieldA.qml</file>
         <file alias="components/PathField.qml">../qml/components/PathField.qml</file>
+        <file alias="components/FilePickField.qml">../qml/components/FilePickField.qml</file>
         <file alias="components/ComboField.qml">../qml/components/ComboField.qml</file>
         <file alias="components/SwitchA.qml">../qml/components/SwitchA.qml</file>
         <file alias="components/NumberField.qml">../qml/components/NumberField.qml</file>

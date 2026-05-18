@@ -5,6 +5,7 @@
 #include <QPointer>
 #include <QQueue>
 
+#include "CookiesPreparer.h"
 #include "DownloadJob.h"
 
 class Settings;
@@ -91,7 +92,9 @@ private:
     void setLastError(const QString &e);
     void emitToast(const QString &key);
 
-    QStringList buildYtDlpArgs(const DownloadJob &j) const;
+    // Not const: it asks CookiesPreparer to snapshot any selected browser
+    // profile into a per-job temp dir, which mutates m_cookies.
+    QStringList buildYtDlpArgs(const DownloadJob &j);
     static QString resolveFormatSpec(const QString &choice, const QString &container);
 
     Settings           *m_settings  = nullptr;
@@ -102,4 +105,10 @@ private:
     QHash<int, Active>  m_active;
     QString             m_lastError;
     QString             m_lastToastKey;
+
+    // Pre-snapshots Chromium cookie databases into a per-job temp dir to
+    // sidestep yt-dlp's "Could not copy Chrome cookie database" warning
+    // when the browser is still running.  See CookiesPreparer for the
+    // background.
+    CookiesPreparer     m_cookies;
 };

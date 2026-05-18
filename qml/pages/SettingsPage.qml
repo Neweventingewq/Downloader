@@ -211,19 +211,68 @@ Item {
                         }
 
                         Text { text: i18n.t("set.containerVideo"); color: theme.textSecondary; font.pixelSize: 12; font.family: "Inter, Segoe UI, sans-serif" }
-                        ComboField {
-                            Layout.preferredWidth: 160
-                            model: settings.containerVideoChoices()
-                            currentIndex: settings.containerVideoChoices().indexOf(settings.containerVideo)
-                            onActivated: function(idx) { settings.containerVideo = settings.containerVideoChoices()[idx] }
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+
+                            ComboField {
+                                Layout.preferredWidth: 160
+                                model: settings.containerVideoChoices()
+                                currentIndex: settings.containerVideoChoices().indexOf(settings.containerVideo)
+                                onActivated: function(idx) { settings.containerVideo = settings.containerVideoChoices()[idx] }
+                            }
+                            // Short blurb about container compatibility — we now
+                            // prefer AAC audio inside MP4 specifically so the
+                            // file plays in Windows' built-in Films & TV,
+                            // worth telling the user the trade-off.
+                            Text {
+                                Layout.fillWidth: true
+                                visible: settings.containerVideo === "mp4"
+                                text: i18n.t("set.containerVideo.mp4.hint")
+                                color: theme.textSecondary
+                                opacity: 0.75
+                                font.pixelSize: 11
+                                font.family: "Inter, Segoe UI, sans-serif"
+                                wrapMode: Text.WordWrap
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                visible: settings.containerVideo === "mkv" || settings.containerVideo === "webm"
+                                text: i18n.t("set.containerVideo.other.hint")
+                                color: theme.textSecondary
+                                opacity: 0.75
+                                font.pixelSize: 11
+                                font.family: "Inter, Segoe UI, sans-serif"
+                                wrapMode: Text.WordWrap
+                            }
                         }
 
                         Text { text: i18n.t("set.audioFormat"); color: theme.textSecondary; font.pixelSize: 12; font.family: "Inter, Segoe UI, sans-serif" }
-                        ComboField {
-                            Layout.preferredWidth: 160
-                            model: settings.audioFormatChoices()
-                            currentIndex: settings.audioFormatChoices().indexOf(settings.audioFormat)
-                            onActivated: function(idx) { settings.audioFormat = settings.audioFormatChoices()[idx] }
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+
+                            ComboField {
+                                Layout.preferredWidth: 160
+                                model: settings.audioFormatChoices()
+                                currentIndex: settings.audioFormatChoices().indexOf(settings.audioFormat)
+                                onActivated: function(idx) { settings.audioFormat = settings.audioFormatChoices()[idx] }
+                            }
+                            // The mp3/m4a/opus picker only applies to audio-only
+                            // extraction (the "Audio" quick action / playlist
+                            // audio mode).  For video downloads yt-dlp keeps the
+                            // best audio stream from YouTube as-is — surfacing
+                            // that out loud avoids the "why is my MP4 still in
+                            // opus?" surprise.
+                            Text {
+                                Layout.fillWidth: true
+                                text: i18n.t("set.audioFormat.hint")
+                                color: theme.textSecondary
+                                opacity: 0.75
+                                font.pixelSize: 11
+                                font.family: "Inter, Segoe UI, sans-serif"
+                                wrapMode: Text.WordWrap
+                            }
                         }
 
                         Text { text: i18n.t("set.audioQuality"); color: theme.textSecondary; font.pixelSize: 12; font.family: "Inter, Segoe UI, sans-serif" }
@@ -346,18 +395,47 @@ Item {
                         }
 
                         Text { text: i18n.t("set.cookiesBrowser"); color: theme.textSecondary; font.pixelSize: 12; font.family: "Inter, Segoe UI, sans-serif" }
-                        ComboField {
-                            Layout.preferredWidth: 200
-                            model: settings.cookiesBrowserChoices()
-                            currentIndex: settings.cookiesBrowserChoices().indexOf(settings.cookiesFromBrowser)
-                            onActivated: function(idx) { settings.cookiesFromBrowser = settings.cookiesBrowserChoices()[idx] }
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 4
+                            ComboField {
+                                Layout.preferredWidth: 200
+                                model: settings.cookiesBrowserChoices()
+                                currentIndex: settings.cookiesBrowserChoices().indexOf(settings.cookiesFromBrowser)
+                                onActivated: function(idx) { settings.cookiesFromBrowser = settings.cookiesBrowserChoices()[idx] }
+                            }
+                            // Surfaced inline, not as a tooltip, so the user sees it
+                            // immediately when the dropdown is on a Chromium-based
+                            // browser — that's where the database-lock issue bites.
+                            Text {
+                                Layout.fillWidth: true
+                                visible: settings.cookiesFromBrowser !== "none"
+                                      && settings.cookiesFromBrowser !== "firefox"
+                                      && settings.cookiesFromBrowser !== "safari"
+                                      && settings.cookiesFromBrowser !== ""
+                                text: i18n.t("set.cookiesBrowser.hint")
+                                color: theme.textSecondary
+                                opacity: 0.75
+                                font.pixelSize: 11
+                                font.family: "Inter, Segoe UI, sans-serif"
+                                wrapMode: Text.WordWrap
+                            }
                         }
 
                         Text { text: i18n.t("set.cookiesFile"); color: theme.textSecondary; font.pixelSize: 12; font.family: "Inter, Segoe UI, sans-serif" }
-                        TextFieldA {
+                        FilePickField {
                             Layout.fillWidth: true
-                            text: settings.cookiesFile
-                            onEditingFinished: settings.cookiesFile = text
+                            path: settings.cookiesFile
+                            browseTitle: i18n.t("set.cookiesFile")
+                            // Netscape cookies.txt is the only sensible format here,
+                            // but we keep `All files` as the second filter so users with
+                            // unusual file names (no extension, .cookies, .dat…) still
+                            // see their file in the picker.
+                            nameFilters: [
+                                "Netscape cookies (*.txt cookies.txt)",
+                                "All files (*)"
+                            ]
+                            onFilePicked: function(p) { settings.cookiesFile = p }
                         }
 
                         Text { text: i18n.t("set.userAgent"); color: theme.textSecondary; font.pixelSize: 12; font.family: "Inter, Segoe UI, sans-serif" }
@@ -389,19 +467,29 @@ Item {
                         rowSpacing: 8
 
                         Text { text: i18n.t("set.ytDlpPath"); color: theme.textSecondary; font.pixelSize: 12; font.family: "Inter, Segoe UI, sans-serif" }
-                        TextFieldA {
+                        FilePickField {
                             Layout.fillWidth: true
-                            placeholderText: "/usr/local/bin/yt-dlp"
-                            text: settings.ytDlpPathOverride
-                            onEditingFinished: settings.ytDlpPathOverride = text
+                            path: settings.ytDlpPathOverride
+                            browseTitle: i18n.t("set.ytDlpPath")
+                            nameFilters: [
+                                "yt-dlp executable (yt-dlp yt-dlp.exe)",
+                                "Executables (*.exe)",
+                                "All files (*)"
+                            ]
+                            onFilePicked: function(p) { settings.ytDlpPathOverride = p }
                         }
 
                         Text { text: i18n.t("set.ffmpegPath"); color: theme.textSecondary; font.pixelSize: 12; font.family: "Inter, Segoe UI, sans-serif" }
-                        TextFieldA {
+                        FilePickField {
                             Layout.fillWidth: true
-                            placeholderText: "/usr/bin/ffmpeg"
-                            text: settings.ffmpegPathOverride
-                            onEditingFinished: settings.ffmpegPathOverride = text
+                            path: settings.ffmpegPathOverride
+                            browseTitle: i18n.t("set.ffmpegPath")
+                            nameFilters: [
+                                "ffmpeg executable (ffmpeg ffmpeg.exe)",
+                                "Executables (*.exe)",
+                                "All files (*)"
+                            ]
+                            onFilePicked: function(p) { settings.ffmpegPathOverride = p }
                         }
 
                         Text { text: i18n.t("set.extraArgs"); color: theme.textSecondary; font.pixelSize: 12; font.family: "Inter, Segoe UI, sans-serif" }

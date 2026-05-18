@@ -235,7 +235,7 @@ void DownloadManager::startJob(int jobId)
     emit activeCountChanged();
 }
 
-QStringList DownloadManager::buildYtDlpArgs(const DownloadJob &j) const
+QStringList DownloadManager::buildYtDlpArgs(const DownloadJob &j)
 {
     QStringList args;
     args << QStringLiteral("--newline")
@@ -289,7 +289,12 @@ QStringList DownloadManager::buildYtDlpArgs(const DownloadJob &j) const
     }
     if (m_settings->cookiesFromBrowser() != QStringLiteral("none")
         && !m_settings->cookiesFromBrowser().isEmpty()) {
-        args << QStringLiteral("--cookies-from-browser") << m_settings->cookiesFromBrowser();
+        // We hand off to CookiesPreparer, which either pre-copies the
+        // Chromium profile to a temp directory (and points yt-dlp at
+        // that copy via `chrome:/abs/path`) or falls back to passing
+        // `--cookies-from-browser <browser>` unchanged.  Either way the
+        // returned args go straight onto the yt-dlp command line.
+        args << m_cookies.prepareArgs(j.id, m_settings->cookiesFromBrowser());
     }
     if (!m_settings->cookiesFile().isEmpty()) {
         args << QStringLiteral("--cookies") << m_settings->cookiesFile();
@@ -344,16 +349,53 @@ QStringList DownloadManager::buildYtDlpArgs(const DownloadJob &j) const
 
 QString DownloadManager::resolveFormatSpec(const QString &choice, const QString &container)
 {
-    Q_UNUSED(container);
+    // Container-aware audio preference.  YouTube routinely returns the
+    // "best" audio as Opus (160 kbps) even when the video stream is
+    // h264/mp4 — and ffmpeg happily wraps Opus into an .mp4 container.
+    // The file is technically valid MP4, but Windows' built-in Films &
+    // TV / Media Player can't decode Opus, so the user sees a video
+    // with no sound.  For mp4 output we therefore prefer m4a (AAC)
+    // audio explicitly: AAC inside MP4 is the universally supported
+    // combination and is what every Windows player understands out of
+    // the box.  For mkv / webm we leave the chain alone — those
+    // containers carry Opus natively and the kind of player that
+    // opens them (VLC / mpv / Chrome) doesn't have the Opus problem.
+    //
+    // Every chain still ends with the same `bv*+ba/b/best` universal
+    // safety net so we don't fail with "Requested format is not
+    // available" on videos with stripped/unusual format lists.
+    const bool isMp4 = (container.compare(QStringLiteral("mp4"), Qt::CaseInsensitive) == 0);
+
     if (choice == QStringLiteral("best")) {
-        return QStringLiteral("bv*+ba/b");
+        if (isMp4) {
+            return QStringLiteral(
+                "bv*[ext=mp4]+ba[ext=m4a]/"
+                "bv*+ba[ext=m4a]/"
+                "bv*+ba/b/best");
+        }
+        return QStringLiteral("bv*+ba/b/best");
     }
     bool isNumeric = false;
     const int h = choice.toInt(&isNumeric);
     if (isNumeric && h > 0) {
-        return QString("bv*[height<=%1]+ba/b[height<=%1]/b").arg(h);
+        if (isMp4) {
+            return QString(
+                "bv*[height<=%1][ext=mp4]+ba[ext=m4a]/"
+                "bv*[height<=%1]+ba[ext=m4a]/"
+                "bv*[height<=%1]+ba/b[height<=%1]/"
+                "bv*+ba/b/best").arg(h);
+        }
+        // Non-mp4 height-bounded path: honour the height cap first,
+        // then fall back to the unbounded bv*+ba/b/best safety net.
+        return QString("bv*[height<=%1]+ba/b[height<=%1]/bv*+ba/b/best").arg(h);
     }
-    return QStringLiteral("bv*+ba/b");
+    if (isMp4) {
+        return QStringLiteral(
+            "bv*[ext=mp4]+ba[ext=m4a]/"
+            "bv*+ba[ext=m4a]/"
+            "bv*+ba/b/best");
+    }
+    return QStringLiteral("bv*+ba/b/best");
 }
 
 // ---------------------------------------------------------------------------
@@ -467,10 +509,73 @@ void DownloadManager::parseProgressLine(int jobId, const QString &line)
 void DownloadManager::parseStderrLine(int jobId, const QString &line)
 {
     // yt-dlp prints "ERROR: ..." on stderr for actual failures.
+    //
+    // It also prints WARNINGs that, while non-fatal in yt-dlp's eyes,
+    // are very often the root cause of the eventual "Failed" status the
+    // user sees — most notably the cookie-database lock that's so
+    // entrenched it has its own bug tracker entry
+    // (yt-dlp issue 7271).  We hoist that one up into a clear, localised
+    // error key so the QML side can render a useful explanation instead
+    // of the raw English yt-dlp warning text.
     m_model->mergeJob(jobId, [&](DownloadJob &j) {
         j.logTail.append(line);
         j.logTail.append(QChar('\n'));
         if (j.logTail.size() > 65536) j.logTail = j.logTail.right(65536);
+
+        // Cookie-database lock — substring match because yt-dlp prefixes
+        // the message with timestamps / WARNING markers that vary
+        // between versions, and the browser name is interpolated into
+        // the text on some builds ("Chrome", "Edge", ...).
+        if (line.contains(QStringLiteral("Could not copy"), Qt::CaseInsensitive)
+         && line.contains(QStringLiteral("cookie database"),  Qt::CaseInsensitive)) {
+            j.errorKey  = QStringLiteral("error.cookiesLocked");
+            j.errorText = line.trimmed();
+        }
+
+        // Chrome 127+ App-Bound Encryption — yt-dlp can't unwrap the
+        // master cookie key because the wrapping DPAPI blob is gated
+        // behind `elevation_service.exe`.  Closing the browser does
+        // NOT fix this one (it's a software-level limitation, not a
+        // file-lock issue), so we surface a different, more
+        // actionable explanation pointing the user at the
+        // export-cookies-to-file workaround.  See yt-dlp issue 10927.
+        if (line.contains(QStringLiteral("Failed to decrypt"), Qt::CaseInsensitive)
+         && line.contains(QStringLiteral("DPAPI"),             Qt::CaseInsensitive)) {
+            j.errorKey  = QStringLiteral("error.cookiesDpapi");
+            j.errorText = line.trimmed();
+        }
+
+        // "Requested format is not available" — yt-dlp went through
+        // every fallback in our -f chain and none of them matched.
+        // Usually means the user picked a height cap (e.g. 1080p)
+        // and this particular video has no formats at all, only
+        // live/premiere/DRM placeholders, or a very narrow preferred
+        // codec was set.  We surface a localised hint to widen the
+        // selector via Settings; with the safer chain in
+        // resolveFormatSpec() (which now always ends with bv*+ba/b/best)
+        // this should be rare, but it can still happen for live
+        // streams and members-only manifests.
+        if (line.contains(QStringLiteral("Requested format is not available"), Qt::CaseInsensitive)) {
+            j.errorKey  = QStringLiteral("error.formatNotAvailable");
+            j.errorText = line.trimmed();
+        }
+
+        // YouTube anti-bot challenge.  yt-dlp's own message is
+        //   "Sign in to confirm you're not a bot.  Use
+        //    --cookies-from-browser or --cookies for the authentication."
+        // and it usually means either no cookies were supplied or the
+        // cookies that were supplied got rejected (the most common
+        // upstream cause of that is the DPAPI failure above swallowing
+        // the cookie jar silently).  We give the user a single,
+        // actionable sentence — same answer as the cookie errors, just
+        // phrased from YouTube's angle so the row makes sense even
+        // when read in isolation.
+        if (line.contains(QStringLiteral("Sign in to confirm you"),   Qt::CaseInsensitive)
+         && line.contains(QStringLiteral("re not a bot"),             Qt::CaseInsensitive)) {
+            j.errorKey  = QStringLiteral("error.youtubeBotCheck");
+            j.errorText = line.trimmed();
+        }
+
         if (line.startsWith(QStringLiteral("ERROR:"))) {
             j.errorText = line.mid(QStringLiteral("ERROR:").size()).trimmed();
         }
@@ -515,6 +620,11 @@ void DownloadManager::onProcessFinished(int jobId, int exitCode, int exitStatus)
         }
     });
 
+    // Drop the per-job cookie snapshot now that yt-dlp is done with it.
+    // Done unconditionally — both the success and failure paths above
+    // are terminal for this job and won't re-read those files.
+    m_cookies.cleanupForJob(jobId);
+
     m_active.remove(jobId);
     emit activeCountChanged();
     pump();
@@ -554,6 +664,7 @@ void DownloadManager::retryJob(int jobId)
             j.status         = DownloadJob::Queued;
             j.statusText     = QStringLiteral("status.queued");
             j.errorText.clear();
+            j.errorKey.clear();
             j.downloadedBytes= 0;
             j.totalBytes     = -1;
             j.progress       = 0.0;

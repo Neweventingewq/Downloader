@@ -187,7 +187,7 @@ private:
     // Theme / UI
     QString m_themeMode      = QStringLiteral("dark");
     bool    m_compact        = false;
-    QString m_language       = QStringLiteral("ru");
+    QString m_language       = QStringLiteral("en");
 
     // Output / naming
     QString m_outputDir;
@@ -206,7 +206,7 @@ private:
     bool    m_writeSubs        = false;
     bool    m_writeAutoSubs    = false;
     bool    m_embedSubs        = false;
-    QString m_subLangs         = QStringLiteral("en,ru");
+    QString m_subLangs         = QStringLiteral("en,uk");
     bool    m_writeThumbnail   = false;
     bool    m_embedThumbnail   = false;
     bool    m_embedMetadata    = true;

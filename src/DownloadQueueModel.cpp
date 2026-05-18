@@ -31,6 +31,7 @@ QHash<int, QByteArray> DownloadQueueModel::roleNames() const
         { OutputDirRole,       "outputDir"       },
         { FormatChoiceRole,    "formatChoice"    },
         { ErrorTextRole,       "errorText"       },
+        { ErrorKeyRole,        "errorKey"        },
         { StartedAtRole,       "startedAt"       },
         { FinishedAtRole,      "finishedAt"      },
         { LogTailRole,         "logTail"         },
@@ -62,6 +63,7 @@ QVariant DownloadQueueModel::data(const QModelIndex &index, int role) const
     case OutputDirRole:       return j.outputDir;
     case FormatChoiceRole:    return j.formatChoice;
     case ErrorTextRole:       return j.errorText;
+    case ErrorKeyRole:        return j.errorKey;
     case StartedAtRole:       return j.startedAt;
     case FinishedAtRole:      return j.finishedAt;
     case LogTailRole:         return j.logTail;

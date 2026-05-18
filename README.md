@@ -33,7 +33,7 @@ These rules are repeated in `CONTRIBUTING` workflow (PR template / commit messag
   - **Dark** — graphite floor with amber accent. The default.
   - **Blackout** — pure `#000000` floor for OLED panels and matte-black setups.
 - A **Compact** mode that collapses the sidebar to a 64-px rail of icons and shrinks the window.
-- Bilingual UI (Russian / English), switchable at runtime without restart.
+- Bilingual UI (English / Ukrainian), switchable at runtime without restart. English is the default; Ukrainian is the second bundled locale.
 - Frameless window with a custom title bar and corner resize handle.
 
 ---
@@ -61,7 +61,7 @@ Volchaydownloader/
 │   ├── main.cpp                # QGuiApplication, QML context properties, engine
 │   ├── Settings.{h,cpp}        # QSettings-backed flexible configuration
 │   ├── Theme.{h,cpp}           # Snow / Dark / Blackout palette
-│   ├── Locale.{h,cpp}          # Static RU/EN translation table, i18n.t()
+│   ├── Locale.{h,cpp}          # Static EN/UK translation table, i18n.t()
 │   ├── ToolsLocator.{h,cpp}    # Finds yt-dlp / ffmpeg on disk
 │   ├── DownloadJob.{h,cpp}     # Plain struct describing one job
 │   ├── DownloadQueueModel.{h,cpp}  # QAbstractListModel exposing the queue
@@ -85,7 +85,7 @@ Volchaydownloader/
 |---|---|---|
 | `Settings` | Persistent user configuration, exposed to QML as `settings`. | Every property uses `Q_PROPERTY` + `NOTIFY` + a QSettings-backed setter. Saving happens on the same call that mutates the value, so the file on disk is always consistent. `Q_INVOKABLE` helpers (`formatChoices()`, `audioFormatChoices()` …) feed the comboboxes. |
 | `Theme` | Dynamic colour palette, exposed to QML as `theme`. | Re-emits `paletteChanged` whenever `settings.themeMode` changes. All colours come from a switch on the current mode — no QtQuickControls styling hacks required. |
-| `Locale` | Built-in RU/EN translation table, exposed as `i18n`. | We don't use `tr()` / `QTranslator` because the catalogue is small and live language switching is required. `i18n.t("nav.home")` looks up by key; missing keys fall back to themselves so untranslated strings are immediately visible. `main.cpp` re-binds the `i18n` context property and calls `engine.retranslate()` whenever the language changes. |
+| `Locale` | Built-in EN/UK translation table, exposed as `i18n`. | We don't use `tr()` / `QTranslator` because the catalogue is small and live language switching is required. `i18n.t("nav.home")` looks up by key; missing keys fall back to themselves so untranslated strings are immediately visible. `main.cpp` re-binds the `i18n` context property and calls `engine.retranslate()` whenever the language changes. |
 | `ToolsLocator` | Finds `yt-dlp` and `ffmpeg`. | Search order: (1) user override from Settings, (2) directory next to the executable (this is how the Windows release ships its tools), (3) `$PATH`. Reports version strings by running the binaries once on startup. Exposed as `tools`. |
 | `DownloadJob` | POD describing one download (id / url / title / progress / status / log tail …). | Lives only inside the model. |
 | `DownloadQueueModel` | `QAbstractListModel` of `DownloadJob`. | Single source of truth for queue state. Exposes named roles (`title`, `progress`, `status`, …) so QML delegates can bind directly. Counts (`activeCount`, `queuedCount`, `finishedCount`, `failedCount`) are bindable Q_PROPERTYs. |
@@ -207,7 +207,7 @@ This section grows over time. Every change to the code base is summarised here s
 
 ### Step 5 — Locale (i18n)
 
-- One Russian / English string per UI key, stored in a `QHash<key, QHash<lang, text>>`. `t("foo")` returns the language-specific value (falling back to RU, then to the key for diagnostics).
+- One English / Ukrainian string per UI key, stored in a `QHash<key, QHash<lang, text>>`. `t("foo")` returns the language-specific value (falling back to EN, then to the key for diagnostics). English is the primary language and the universal fallback — keys that lack a Ukrainian translation will render in English rather than show the raw key, so the UI is never broken by a missed string.
 - `t1(key, arg1)` / `t2(key, arg1, arg2)` are thin wrappers around `QString::arg`. They cover the few strings that need parameter substitution.
 
 ### Step 6 — ToolsLocator
@@ -272,7 +272,55 @@ This section grows over time. Every change to the code base is summarised here s
 - `resources/icons/app.png` (used as the window icon) and `resources/icons/app.ico` (used by the Windows resource) are generated programmatically — a rounded amber-tinted square with the amber play triangle. No external image editor in the loop.
 - `resources/app.rc` declares the icon + the embedded version block (`FILEVERSION`, `CompanyName`, `ProductName`, …) used by Windows Explorer when right-clicking the `.exe`.
 
-### Step 13 — GitHub Actions
+### Step 13 — Robust cookies-from-browser (yt-dlp lock workaround)
+
+- `--cookies-from-browser chrome` (and its sister flags `edge`, `brave`, `opera`, `vivaldi`, `chromium`) routinely fails on Windows with the warning *"Could not copy Chrome cookie database. See https://github.com/yt-dlp/yt-dlp/issues/7271 for more info"*. The root cause is that running Chromium-based browsers hold their `Cookies` SQLite database open with an exclusive write lock, so yt-dlp's own `shutil.copy` can't take a snapshot to read from. Downloads that need authentication (age-restricted YouTube, member videos, channel-only content) then fall back to anonymous requests and fail with a 403 or "Sign in to confirm your age".
+- `src/CookiesPreparer.{h,cpp}` is a small helper that sidesteps the issue from the application's side. Before each download that requests `cookies-from-browser`, the preparer:
+  1. Resolves the default user-data directory for the selected browser using OS-aware paths (`%LOCALAPPDATA%\Google\Chrome\User Data` on Windows, `~/.config/google-chrome` on Linux, `~/Library/Application Support/Google/Chrome` on macOS, plus the corresponding paths for Edge / Brave / Opera / Vivaldi / Chromium).
+  2. Snapshots the few files yt-dlp actually reads — `Local State` for the DPAPI-wrapped AES key plus the `Default/Cookies` SQLite and its `-journal` / `-wal` / `-shm` sidecars (and the `Network/Cookies` variant used by recent Chrome builds) — into a per-job temporary directory.
+  3. Uses `QFile::copy` with a five-attempt retry/backoff loop (100 / 200 / 300 / 400 / 500 ms). Qt's `CopyFileExW` on Windows opens both ends with `FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE`, and the retries ride out the brief windows when Chromium briefly takes an exclusive lock for a write transaction, which is the failure mode `shutil.copy` hits.
+  4. Rewrites the yt-dlp invocation to `--cookies-from-browser <browser>:<abs/path/to/temp/profile>`. yt-dlp accepts an absolute path as the PROFILE argument and reads `Local State` from the parent of that path, so our staged layout (`<tmp>/Local State` + `<tmp>/Default/Cookies`) plugs in without further changes on the yt-dlp side.
+  5. Hands the temp directory's lifetime to `DownloadManager`, which calls `CookiesPreparer::cleanupForJob()` from `onProcessFinished()` whether the job succeeded, failed, or was cancelled. The destructor's `cleanupAll()` mops up any orphans on app exit.
+- If the snapshot fails outright (e.g. the browser holds the lock for the full backoff window, the user-data dir doesn't exist on this machine, or the profile is named something other than `Default`), the preparer falls back to passing `--cookies-from-browser <browser>` unchanged so the user is never worse off than before this step.
+- Firefox / Safari are passed through unchanged — Firefox's SQLite WAL mode allows shared reads and Safari is read via macOS APIs that don't touch the database file directly, so they don't hit the lock problem.
+- `DownloadManager::parseStderrLine()` watches for the literal `"Could not copy … cookie database"` line (case-insensitive substring) and tags the job with `errorKey = "error.cookiesLocked"`. The QML `QueueItemCard` prefers `i18n.t(errorKey)` over the raw `errorText`, so the user sees a translated, actionable sentence (*"The browser is holding its cookie database locked. Close Chrome / Edge / Brave fully…"*) instead of yt-dlp's English warning with a GitHub link.
+- The Settings page's *Cookies from browser* dropdown now renders an inline 11 px hint underneath whenever the selected browser is a Chromium-based one, explaining the limitation and pointing at the *Cookies file (Netscape)* alternative for users who prefer to keep their browser running.
+- New role `errorKey` on `DownloadQueueModel`, new field `DownloadJob::errorKey` and a matching reset in `retryJob()` so a retried row starts clean.
+
+### Step 14 — Chrome 127+ App-Bound Encryption + UI localisation switch (English default, Russian → Ukrainian)
+
+- The cookie story has a second failure mode that closing the browser does **not** fix. Since Chrome 127 (August 2024) Chromium uses *App-Bound Encryption* for `Cookies`: the master AES key in `Local State` is wrapped with a DPAPI blob that can only be unwrapped by the elevated `elevation_service.exe` process. yt-dlp can read the bytes but can't decrypt them and prints *"Failed to decrypt with DPAPI. See https://github.com/yt-dlp/yt-dlp/issues/10927 for more info"*. Unlike the file lock from Step 13, this isn't a snapshot problem — it's a software-side limitation that has no clean fix on either yt-dlp's or this app's side.
+- `DownloadManager::parseStderrLine()` now also recognises this signature (case-insensitive substring match on *both* `"Failed to decrypt"` and `"DPAPI"`, because yt-dlp prefixes the line with `WARNING:` on some builds and `ERROR:` on others) and tags the job with `errorKey = "error.cookiesDpapi"`. The QML side uses the localised message to point the user at the only two workable workarounds: export cookies to a Netscape `.txt` file with a browser extension (e.g. *Get cookies.txt LOCALLY*) and feed it via *Cookies file*, or switch to Firefox.
+- The *Cookies from browser* hint on the Settings page was rewritten in the same pass to mention both failure modes explicitly — "running browsers hold the database locked" *and* "Chrome 127+ encrypts cookies app-bound" — so the user understands why closing the browser sometimes is not enough.
+- The bundled UI languages were re-shuffled in the same commit: English is now the default first-launch language and the universal fallback (`Locale::language()` returns `"en"` for any unknown / legacy locale), Ukrainian replaces Russian as the second locale, and `Settings::languageChoices()` returns `{ "en", "uk" }`. The `put(table, key, en, uk)` helper in `AppLocale.cpp` swapped its parameter order accordingly — English first because it is the fallback. `set.language.ru` was retired, `set.language.uk` ("Українська" / "Ukrainian") was added, and the default value of the subtitle-language hint (`Settings::m_subLangs`) was migrated from `"en,ru"` to `"en,uk"` so first-time downloaders get matching subtitles. Stored profiles that still hold `language = "ru"` from older builds keep working — they silently land on English via the fallback, so nobody sees a broken UI after upgrading.
+
+### Step 15 — Browse buttons for file paths + YouTube bot-check error key
+
+- The Settings page had three plain text inputs (*Cookies file*, *Path to yt-dlp*, *Path to ffmpeg*) where the user was expected to either type or paste an absolute path. Real Windows users rightly complained that an *Open file…* button was missing.
+- New component `qml/components/FilePickField.qml` is the file-picker sibling of `PathField.qml`: same RowLayout / TextFieldA / GhostButton triple, but the underlying dialog is `QtQuick.Dialogs.FileDialog` with `fileMode: FileDialog.OpenFile` and configurable `nameFilters`. Unlike `PathField`, the text input is editable (not read-only) — power users routinely paste an absolute path and Tab away, and read-only mode would needlessly lock them out. The `filePicked(newPath)` signal fires both on dialog accept and on direct edit-and-commit, so the caller only needs one slot.
+- `SettingsPage.qml` now uses `FilePickField` for all three fields. The cookies row filters on `*.txt cookies.txt`, the yt-dlp / ffmpeg rows filter on the executable name + `*.exe` (so users on Windows can pick the binary out of an unzipped folder). Every dialog title is fed through `i18n.t()` so it switches with the UI language.
+- `DownloadManager::parseStderrLine()` got a third recognised yt-dlp signature: the YouTube anti-bot challenge *"Sign in to confirm you're not a bot. Use --cookies-from-browser or --cookies for the authentication."* This is almost always a downstream symptom of the cookie failures in Steps 13/14 (no cookies got passed, or DPAPI ate them silently), so the new `error.youtubeBotCheck` key gives the user the same actionable answer — export cookies via extension, or switch to Firefox — phrased from YouTube's angle so the row makes sense on its own.
+
+### Step 16 — Robust format selection + "Requested format is not available" error key
+
+- `DownloadManager::resolveFormatSpec()` now always ends every selector chain with a `b/best` safety net so we never hand yt-dlp a chain that can yield zero matches. The full strings are now `bv*+ba/b/best` (for "Best available") and `bv*[height<=N]+ba/b[height<=N]/bv*+ba/b/best` (for a numeric height cap). The height-bounded selectors still come first so we honour the user's quality choice when possible, but if YouTube returns an unusual format set for a specific video (live event, premiere, members-only with stripped formats), the unbounded `bv*+ba/b/best` at the very end will still grab *some* stream rather than fail outright.
+- `DownloadManager::parseStderrLine()` recognises the matching yt-dlp message *"Requested format is not available. Use --list-formats for a list of available formats"* (case-insensitive substring) and tags the job with `errorKey = "error.formatNotAvailable"`. The localised text in `AppLocale.cpp` tells the user to widen the quality setting and turn off *Prefer free codecs*; for live streams / premieres it also calls out the realistic possibility that the stream isn't accessible to non-members at all.
+
+### Step 17 — Container-aware audio: prefer AAC inside MP4
+
+- Real-user bug: a downloaded MP4 video opened in Windows' built-in Films & TV / Media Player with the message *"We can't play the audio for … It's encoded in Opus format which isn't supported."* The file was a valid MP4 — yt-dlp simply picked the best audio stream from YouTube (Opus, 160 kbps) and ffmpeg muxed it into the chosen MP4 container. Windows' built-in player can't decode Opus, so the user got a silent video. VLC / mpv / Chrome would have played it fine, but every other player on the planet is not an acceptable answer for an out-of-the-box experience.
+- `DownloadManager::resolveFormatSpec(choice, container)` now actually uses its `container` argument. For MP4 output it returns a chain that **explicitly prefers M4A (AAC) audio**:
+  - `best` → `bv*[ext=mp4]+ba[ext=m4a]/bv*+ba[ext=m4a]/bv*+ba/b/best`
+  - numeric height `H` → `bv*[height<=H][ext=mp4]+ba[ext=m4a]/bv*[height<=H]+ba[ext=m4a]/bv*[height<=H]+ba/b[height<=H]/bv*+ba/b/best`
+
+  AAC inside MP4 is the universally supported combination that plays in every Windows player out of the box, including Films & TV. The chain still falls back to whatever YouTube actually has (so the very rare videos that only ship Opus still download — they just won't play in Films & TV, which is the same situation we were rescuing from), and ends with the same `bv*+ba/b/best` safety net from Step 16.
+- For `mkv` / `webm` containers the chain stays exactly as it was (`bv*+ba/b/best` or its height-bounded sibling): those containers carry Opus natively and the kind of player that opens them (VLC, mpv, Chrome) handles Opus without complaints. So in MKV/WebM mode we deliberately keep the higher-bitrate Opus stream rather than downgrading to AAC.
+- The Settings page got two inline hints to make this trade-off explicit:
+  - Under *Video container* when MP4 is selected: *"Recommended: plays in every player, including Windows' built-in Films & TV. yt-dlp is told to prefer AAC audio for MP4 output so the file plays out of the box."*
+  - Under *Video container* when MKV / WebM is selected: *"Better quality (keeps YouTube's original Opus / VP9 / AV1 streams without re-mixing), but Windows' built-in player won't open it — use VLC / mpv / Chrome / a modern media player."*
+  - Under *Audio format*: *"Only used for audio-only downloads (the Audio quick action). For video downloads the app keeps YouTube's best audio stream as-is and merges it into the chosen container."* The previous wording was silent about this scope and users reasonably assumed the *Audio format = mp3* setting would force MP3 audio inside their MP4 — it doesn't, and yt-dlp has no clean way to do that without lossy re-encoding, so the honest answer is to surface the scope rather than mislead.
+
+### Step 18 — GitHub Actions
 
 - `build-linux.yml` installs the same apt packages listed in the *Building* section, configures CMake with Ninja, builds, and asserts the resulting binary exists and is executable. Fast: the whole job typically completes in well under five minutes and acts as the canonical "did I break the build?" gate.
 - `build-windows.yml` installs Qt 6.6.3 via `jurplel/install-qt-action` (with module cache), pulls in MSVC via `ilammy/msvc-dev-cmd`, configures CMake with Ninja + `cl.exe`, builds Release, then runs `windeployqt --qmldir qml` against the freshly-built `.exe`. After that it downloads the latest official `yt-dlp.exe` and an *essentials* ffmpeg build, copies `ffmpeg.exe` / `ffprobe.exe` next to the `.exe`, zips the result, and uploads the artefact (and the raw `dist/` tree). The job retains the artefact for 30 days.
