@@ -33,7 +33,7 @@ These rules are repeated in `CONTRIBUTING` workflow (PR template / commit messag
   - **Dark** — graphite floor with amber accent. The default.
   - **Blackout** — pure `#000000` floor for OLED panels and matte-black setups.
 - A **Compact** mode that collapses the sidebar to a 64-px rail of icons and shrinks the window.
-- Bilingual UI (Russian / English), switchable at runtime without restart.
+- Bilingual UI (English / Ukrainian), switchable at runtime without restart. English is the default; Ukrainian is the second bundled locale.
 - Frameless window with a custom title bar and corner resize handle.
 
 ---
@@ -61,7 +61,7 @@ Volchaydownloader/
 │   ├── main.cpp                # QGuiApplication, QML context properties, engine
 │   ├── Settings.{h,cpp}        # QSettings-backed flexible configuration
 │   ├── Theme.{h,cpp}           # Snow / Dark / Blackout palette
-│   ├── Locale.{h,cpp}          # Static RU/EN translation table, i18n.t()
+│   ├── Locale.{h,cpp}          # Static EN/UK translation table, i18n.t()
 │   ├── ToolsLocator.{h,cpp}    # Finds yt-dlp / ffmpeg on disk
 │   ├── DownloadJob.{h,cpp}     # Plain struct describing one job
 │   ├── DownloadQueueModel.{h,cpp}  # QAbstractListModel exposing the queue
@@ -85,7 +85,7 @@ Volchaydownloader/
 |---|---|---|
 | `Settings` | Persistent user configuration, exposed to QML as `settings`. | Every property uses `Q_PROPERTY` + `NOTIFY` + a QSettings-backed setter. Saving happens on the same call that mutates the value, so the file on disk is always consistent. `Q_INVOKABLE` helpers (`formatChoices()`, `audioFormatChoices()` …) feed the comboboxes. |
 | `Theme` | Dynamic colour palette, exposed to QML as `theme`. | Re-emits `paletteChanged` whenever `settings.themeMode` changes. All colours come from a switch on the current mode — no QtQuickControls styling hacks required. |
-| `Locale` | Built-in RU/EN translation table, exposed as `i18n`. | We don't use `tr()` / `QTranslator` because the catalogue is small and live language switching is required. `i18n.t("nav.home")` looks up by key; missing keys fall back to themselves so untranslated strings are immediately visible. `main.cpp` re-binds the `i18n` context property and calls `engine.retranslate()` whenever the language changes. |
+| `Locale` | Built-in EN/UK translation table, exposed as `i18n`. | We don't use `tr()` / `QTranslator` because the catalogue is small and live language switching is required. `i18n.t("nav.home")` looks up by key; missing keys fall back to themselves so untranslated strings are immediately visible. `main.cpp` re-binds the `i18n` context property and calls `engine.retranslate()` whenever the language changes. |
 | `ToolsLocator` | Finds `yt-dlp` and `ffmpeg`. | Search order: (1) user override from Settings, (2) directory next to the executable (this is how the Windows release ships its tools), (3) `$PATH`. Reports version strings by running the binaries once on startup. Exposed as `tools`. |
 | `DownloadJob` | POD describing one download (id / url / title / progress / status / log tail …). | Lives only inside the model. |
 | `DownloadQueueModel` | `QAbstractListModel` of `DownloadJob`. | Single source of truth for queue state. Exposes named roles (`title`, `progress`, `status`, …) so QML delegates can bind directly. Counts (`activeCount`, `queuedCount`, `finishedCount`, `failedCount`) are bindable Q_PROPERTYs. |
@@ -207,7 +207,7 @@ This section grows over time. Every change to the code base is summarised here s
 
 ### Step 5 — Locale (i18n)
 
-- One Russian / English string per UI key, stored in a `QHash<key, QHash<lang, text>>`. `t("foo")` returns the language-specific value (falling back to RU, then to the key for diagnostics).
+- One English / Ukrainian string per UI key, stored in a `QHash<key, QHash<lang, text>>`. `t("foo")` returns the language-specific value (falling back to EN, then to the key for diagnostics). English is the primary language and the universal fallback — keys that lack a Ukrainian translation will render in English rather than show the raw key, so the UI is never broken by a missed string.
 - `t1(key, arg1)` / `t2(key, arg1, arg2)` are thin wrappers around `QString::arg`. They cover the few strings that need parameter substitution.
 
 ### Step 6 — ToolsLocator
@@ -283,11 +283,18 @@ This section grows over time. Every change to the code base is summarised here s
   5. Hands the temp directory's lifetime to `DownloadManager`, which calls `CookiesPreparer::cleanupForJob()` from `onProcessFinished()` whether the job succeeded, failed, or was cancelled. The destructor's `cleanupAll()` mops up any orphans on app exit.
 - If the snapshot fails outright (e.g. the browser holds the lock for the full backoff window, the user-data dir doesn't exist on this machine, or the profile is named something other than `Default`), the preparer falls back to passing `--cookies-from-browser <browser>` unchanged so the user is never worse off than before this step.
 - Firefox / Safari are passed through unchanged — Firefox's SQLite WAL mode allows shared reads and Safari is read via macOS APIs that don't touch the database file directly, so they don't hit the lock problem.
-- `DownloadManager::parseStderrLine()` watches for the literal `"Could not copy … cookie database"` line (case-insensitive substring) and tags the job with `errorKey = "error.cookiesLocked"`. The QML `QueueItemCard` prefers `i18n.t(errorKey)` over the raw `errorText`, so the user sees a translated, actionable sentence (*"Закрой Chrome / Edge / Brave полностью…"*) instead of yt-dlp's English warning with a GitHub link.
+- `DownloadManager::parseStderrLine()` watches for the literal `"Could not copy … cookie database"` line (case-insensitive substring) and tags the job with `errorKey = "error.cookiesLocked"`. The QML `QueueItemCard` prefers `i18n.t(errorKey)` over the raw `errorText`, so the user sees a translated, actionable sentence (*"The browser is holding its cookie database locked. Close Chrome / Edge / Brave fully…"*) instead of yt-dlp's English warning with a GitHub link.
 - The Settings page's *Cookies from browser* dropdown now renders an inline 11 px hint underneath whenever the selected browser is a Chromium-based one, explaining the limitation and pointing at the *Cookies file (Netscape)* alternative for users who prefer to keep their browser running.
 - New role `errorKey` on `DownloadQueueModel`, new field `DownloadJob::errorKey` and a matching reset in `retryJob()` so a retried row starts clean.
 
-### Step 14 — GitHub Actions
+### Step 14 — Chrome 127+ App-Bound Encryption + UI localisation switch (English default, Russian → Ukrainian)
+
+- The cookie story has a second failure mode that closing the browser does **not** fix. Since Chrome 127 (August 2024) Chromium uses *App-Bound Encryption* for `Cookies`: the master AES key in `Local State` is wrapped with a DPAPI blob that can only be unwrapped by the elevated `elevation_service.exe` process. yt-dlp can read the bytes but can't decrypt them and prints *"Failed to decrypt with DPAPI. See https://github.com/yt-dlp/yt-dlp/issues/10927 for more info"*. Unlike the file lock from Step 13, this isn't a snapshot problem — it's a software-side limitation that has no clean fix on either yt-dlp's or this app's side.
+- `DownloadManager::parseStderrLine()` now also recognises this signature (case-insensitive substring match on *both* `"Failed to decrypt"` and `"DPAPI"`, because yt-dlp prefixes the line with `WARNING:` on some builds and `ERROR:` on others) and tags the job with `errorKey = "error.cookiesDpapi"`. The QML side uses the localised message to point the user at the only two workable workarounds: export cookies to a Netscape `.txt` file with a browser extension (e.g. *Get cookies.txt LOCALLY*) and feed it via *Cookies file*, or switch to Firefox.
+- The *Cookies from browser* hint on the Settings page was rewritten in the same pass to mention both failure modes explicitly — "running browsers hold the database locked" *and* "Chrome 127+ encrypts cookies app-bound" — so the user understands why closing the browser sometimes is not enough.
+- The bundled UI languages were re-shuffled in the same commit: English is now the default first-launch language and the universal fallback (`Locale::language()` returns `"en"` for any unknown / legacy locale), Ukrainian replaces Russian as the second locale, and `Settings::languageChoices()` returns `{ "en", "uk" }`. The `put(table, key, en, uk)` helper in `AppLocale.cpp` swapped its parameter order accordingly — English first because it is the fallback. `set.language.ru` was retired, `set.language.uk` ("Українська" / "Ukrainian") was added, and the default value of the subtitle-language hint (`Settings::m_subLangs`) was migrated from `"en,ru"` to `"en,uk"` so first-time downloaders get matching subtitles. Stored profiles that still hold `language = "ru"` from older builds keep working — they silently land on English via the fallback, so nobody sees a broken UI after upgrading.
+
+### Step 15 — GitHub Actions
 
 - `build-linux.yml` installs the same apt packages listed in the *Building* section, configures CMake with Ninja, builds, and asserts the resulting binary exists and is executable. Fast: the whole job typically completes in well under five minutes and acts as the canonical "did I break the build?" gate.
 - `build-windows.yml` installs Qt 6.6.3 via `jurplel/install-qt-action` (with module cache), pulls in MSVC via `ilammy/msvc-dev-cmd`, configures CMake with Ninja + `cl.exe`, builds Release, then runs `windeployqt --qmldir qml` against the freshly-built `.exe`. After that it downloads the latest official `yt-dlp.exe` and an *essentials* ffmpeg build, copies `ffmpeg.exe` / `ffprobe.exe` next to the `.exe`, zips the result, and uploads the artefact (and the raw `dist/` tree). The job retains the artefact for 30 days.

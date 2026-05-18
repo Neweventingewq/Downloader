@@ -131,7 +131,7 @@ void Settings::resetToDefaults()
     // Reset in-memory state to the constructor defaults, then notify.
     m_themeMode          = QStringLiteral("dark");
     m_compact            = false;
-    m_language           = QStringLiteral("ru");
+    m_language           = QStringLiteral("en");
     m_outputDir          = defaultOutputDir();
     m_filenameTemplate   = QStringLiteral("%(title)s [%(id)s].%(ext)s");
     m_restrictFilenames  = false;
@@ -144,7 +144,7 @@ void Settings::resetToDefaults()
     m_writeSubs          = false;
     m_writeAutoSubs      = false;
     m_embedSubs          = false;
-    m_subLangs           = QStringLiteral("en,ru");
+    m_subLangs           = QStringLiteral("en,uk");
     m_writeThumbnail     = false;
     m_embedThumbnail     = false;
     m_embedMetadata      = true;
@@ -222,5 +222,8 @@ QStringList Settings::themeChoices() const
 
 QStringList Settings::languageChoices() const
 {
-    return { "ru", "en" };
+    // English first because it is the default and the fallback used
+    // when an unknown locale slips through (e.g. "ru" left behind in
+    // QSettings by an older build).
+    return { "en", "uk" };
 }

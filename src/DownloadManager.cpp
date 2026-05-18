@@ -495,6 +495,19 @@ void DownloadManager::parseStderrLine(int jobId, const QString &line)
             j.errorText = line.trimmed();
         }
 
+        // Chrome 127+ App-Bound Encryption — yt-dlp can't unwrap the
+        // master cookie key because the wrapping DPAPI blob is gated
+        // behind `elevation_service.exe`.  Closing the browser does
+        // NOT fix this one (it's a software-level limitation, not a
+        // file-lock issue), so we surface a different, more
+        // actionable explanation pointing the user at the
+        // export-cookies-to-file workaround.  See yt-dlp issue 10927.
+        if (line.contains(QStringLiteral("Failed to decrypt"), Qt::CaseInsensitive)
+         && line.contains(QStringLiteral("DPAPI"),             Qt::CaseInsensitive)) {
+            j.errorKey  = QStringLiteral("error.cookiesDpapi");
+            j.errorText = line.trimmed();
+        }
+
         if (line.startsWith(QStringLiteral("ERROR:"))) {
             j.errorText = line.mid(QStringLiteral("ERROR:").size()).trimmed();
         }
