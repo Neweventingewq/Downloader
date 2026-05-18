@@ -211,19 +211,68 @@ Item {
                         }
 
                         Text { text: i18n.t("set.containerVideo"); color: theme.textSecondary; font.pixelSize: 12; font.family: "Inter, Segoe UI, sans-serif" }
-                        ComboField {
-                            Layout.preferredWidth: 160
-                            model: settings.containerVideoChoices()
-                            currentIndex: settings.containerVideoChoices().indexOf(settings.containerVideo)
-                            onActivated: function(idx) { settings.containerVideo = settings.containerVideoChoices()[idx] }
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+
+                            ComboField {
+                                Layout.preferredWidth: 160
+                                model: settings.containerVideoChoices()
+                                currentIndex: settings.containerVideoChoices().indexOf(settings.containerVideo)
+                                onActivated: function(idx) { settings.containerVideo = settings.containerVideoChoices()[idx] }
+                            }
+                            // Short blurb about container compatibility — we now
+                            // prefer AAC audio inside MP4 specifically so the
+                            // file plays in Windows' built-in Films & TV,
+                            // worth telling the user the trade-off.
+                            Text {
+                                Layout.fillWidth: true
+                                visible: settings.containerVideo === "mp4"
+                                text: i18n.t("set.containerVideo.mp4.hint")
+                                color: theme.textSecondary
+                                opacity: 0.75
+                                font.pixelSize: 11
+                                font.family: "Inter, Segoe UI, sans-serif"
+                                wrapMode: Text.WordWrap
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                visible: settings.containerVideo === "mkv" || settings.containerVideo === "webm"
+                                text: i18n.t("set.containerVideo.other.hint")
+                                color: theme.textSecondary
+                                opacity: 0.75
+                                font.pixelSize: 11
+                                font.family: "Inter, Segoe UI, sans-serif"
+                                wrapMode: Text.WordWrap
+                            }
                         }
 
                         Text { text: i18n.t("set.audioFormat"); color: theme.textSecondary; font.pixelSize: 12; font.family: "Inter, Segoe UI, sans-serif" }
-                        ComboField {
-                            Layout.preferredWidth: 160
-                            model: settings.audioFormatChoices()
-                            currentIndex: settings.audioFormatChoices().indexOf(settings.audioFormat)
-                            onActivated: function(idx) { settings.audioFormat = settings.audioFormatChoices()[idx] }
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+
+                            ComboField {
+                                Layout.preferredWidth: 160
+                                model: settings.audioFormatChoices()
+                                currentIndex: settings.audioFormatChoices().indexOf(settings.audioFormat)
+                                onActivated: function(idx) { settings.audioFormat = settings.audioFormatChoices()[idx] }
+                            }
+                            // The mp3/m4a/opus picker only applies to audio-only
+                            // extraction (the "Audio" quick action / playlist
+                            // audio mode).  For video downloads yt-dlp keeps the
+                            // best audio stream from YouTube as-is — surfacing
+                            // that out loud avoids the "why is my MP4 still in
+                            // opus?" surprise.
+                            Text {
+                                Layout.fillWidth: true
+                                text: i18n.t("set.audioFormat.hint")
+                                color: theme.textSecondary
+                                opacity: 0.75
+                                font.pixelSize: 11
+                                font.family: "Inter, Segoe UI, sans-serif"
+                                wrapMode: Text.WordWrap
+                            }
                         }
 
                         Text { text: i18n.t("set.audioQuality"); color: theme.textSecondary; font.pixelSize: 12; font.family: "Inter, Segoe UI, sans-serif" }

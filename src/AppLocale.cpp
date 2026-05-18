@@ -196,7 +196,24 @@ void Locale::buildTable()
 
     put(T, "set.defaultFormat",  "Default quality",            "Якість за замовчуванням");
     put(T, "set.containerVideo", "Video container",            "Контейнер відео");
+    // MP4 hint: explain why MP4 is the safe default and what the
+    // app does about the YouTube-Opus-in-MP4 footgun.
+    put(T, "set.containerVideo.mp4.hint",
+        "Recommended: plays in every player, including Windows' built-in Films & TV. "
+        "yt-dlp is told to prefer AAC audio for MP4 output so the file plays out of the box.",
+        "Рекомендовано: програється у будь-якому плеєрі, зокрема у вбудованому «Кіно і ТБ» Windows. "
+        "yt-dlp націлено на AAC-аудіо для MP4, щоб файл відкривався відразу.");
+    put(T, "set.containerVideo.other.hint",
+        "Better quality (keeps YouTube's original Opus / VP9 / AV1 streams without re-mixing), "
+        "but Windows' built-in player won't open it — use VLC / mpv / Chrome / a modern media player.",
+        "Краща якість (зберігає оригінальні Opus / VP9 / AV1 потоки YouTube без перепаковки), "
+        "але вбудований плеєр Windows такий файл не відкриє — використовуй VLC / mpv / Chrome / сучасний плеєр.");
     put(T, "set.audioFormat",    "Audio format",               "Аудіо-формат");
+    put(T, "set.audioFormat.hint",
+        "Only used for audio-only downloads (the *Audio* quick action). "
+        "For video downloads the app keeps YouTube's best audio stream as-is and merges it into the chosen container.",
+        "Використовується лише для аудіо-завантажень (швидка дія *Аудіо*). "
+        "Для відео-завантажень додаток залишає найкращий аудіо-потік YouTube без змін і кладе його в обраний контейнер.");
     put(T, "set.audioQuality",   "Audio bitrate (0 = best)",   "Аудіо-бітрейт (0 = найкращий)");
     put(T, "set.preferFreeFormats","Prefer free codecs",       "Надавати перевагу вільним кодекам");
 

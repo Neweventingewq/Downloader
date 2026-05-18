@@ -349,25 +349,51 @@ QStringList DownloadManager::buildYtDlpArgs(const DownloadJob &j)
 
 QString DownloadManager::resolveFormatSpec(const QString &choice, const QString &container)
 {
-    Q_UNUSED(container);
-    // Universal fallback appended to every chain: if YouTube returns a
-    // weird format set for a specific video (live event, premiere,
-    // members-only with stripped formats, etc.) and none of the
-    // preferred combinations match, we'd rather end up with *some*
-    // stream than fail with "Requested format is not available".  The
-    // `b` token at the very end is yt-dlp's alias for `best` and
-    // matches the single best-quality stream regardless of
-    // height/container, which is the safest "give me anything" net.
+    // Container-aware audio preference.  YouTube routinely returns the
+    // "best" audio as Opus (160 kbps) even when the video stream is
+    // h264/mp4 — and ffmpeg happily wraps Opus into an .mp4 container.
+    // The file is technically valid MP4, but Windows' built-in Films &
+    // TV / Media Player can't decode Opus, so the user sees a video
+    // with no sound.  For mp4 output we therefore prefer m4a (AAC)
+    // audio explicitly: AAC inside MP4 is the universally supported
+    // combination and is what every Windows player understands out of
+    // the box.  For mkv / webm we leave the chain alone — those
+    // containers carry Opus natively and the kind of player that
+    // opens them (VLC / mpv / Chrome) doesn't have the Opus problem.
+    //
+    // Every chain still ends with the same `bv*+ba/b/best` universal
+    // safety net so we don't fail with "Requested format is not
+    // available" on videos with stripped/unusual format lists.
+    const bool isMp4 = (container.compare(QStringLiteral("mp4"), Qt::CaseInsensitive) == 0);
+
     if (choice == QStringLiteral("best")) {
+        if (isMp4) {
+            return QStringLiteral(
+                "bv*[ext=mp4]+ba[ext=m4a]/"
+                "bv*+ba[ext=m4a]/"
+                "bv*+ba/b/best");
+        }
         return QStringLiteral("bv*+ba/b/best");
     }
     bool isNumeric = false;
     const int h = choice.toInt(&isNumeric);
     if (isNumeric && h > 0) {
-        // The height-bounded selectors come first (we honour the
-        // user's quality cap when possible) and the unbounded
-        // bv*+ba/b/best comes last as the safety net.
+        if (isMp4) {
+            return QString(
+                "bv*[height<=%1][ext=mp4]+ba[ext=m4a]/"
+                "bv*[height<=%1]+ba[ext=m4a]/"
+                "bv*[height<=%1]+ba/b[height<=%1]/"
+                "bv*+ba/b/best").arg(h);
+        }
+        // Non-mp4 height-bounded path: honour the height cap first,
+        // then fall back to the unbounded bv*+ba/b/best safety net.
         return QString("bv*[height<=%1]+ba/b[height<=%1]/bv*+ba/b/best").arg(h);
+    }
+    if (isMp4) {
+        return QStringLiteral(
+            "bv*[ext=mp4]+ba[ext=m4a]/"
+            "bv*+ba[ext=m4a]/"
+            "bv*+ba/b/best");
     }
     return QStringLiteral("bv*+ba/b/best");
 }
