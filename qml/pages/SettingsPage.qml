@@ -346,11 +346,31 @@ Item {
                         }
 
                         Text { text: i18n.t("set.cookiesBrowser"); color: theme.textSecondary; font.pixelSize: 12; font.family: "Inter, Segoe UI, sans-serif" }
-                        ComboField {
-                            Layout.preferredWidth: 200
-                            model: settings.cookiesBrowserChoices()
-                            currentIndex: settings.cookiesBrowserChoices().indexOf(settings.cookiesFromBrowser)
-                            onActivated: function(idx) { settings.cookiesFromBrowser = settings.cookiesBrowserChoices()[idx] }
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 4
+                            ComboField {
+                                Layout.preferredWidth: 200
+                                model: settings.cookiesBrowserChoices()
+                                currentIndex: settings.cookiesBrowserChoices().indexOf(settings.cookiesFromBrowser)
+                                onActivated: function(idx) { settings.cookiesFromBrowser = settings.cookiesBrowserChoices()[idx] }
+                            }
+                            // Surfaced inline, not as a tooltip, so the user sees it
+                            // immediately when the dropdown is on a Chromium-based
+                            // browser — that's where the database-lock issue bites.
+                            Text {
+                                Layout.fillWidth: true
+                                visible: settings.cookiesFromBrowser !== "none"
+                                      && settings.cookiesFromBrowser !== "firefox"
+                                      && settings.cookiesFromBrowser !== "safari"
+                                      && settings.cookiesFromBrowser !== ""
+                                text: i18n.t("set.cookiesBrowser.hint")
+                                color: theme.textSecondary
+                                opacity: 0.75
+                                font.pixelSize: 11
+                                font.family: "Inter, Segoe UI, sans-serif"
+                                wrapMode: Text.WordWrap
+                            }
                         }
 
                         Text { text: i18n.t("set.cookiesFile"); color: theme.textSecondary; font.pixelSize: 12; font.family: "Inter, Segoe UI, sans-serif" }

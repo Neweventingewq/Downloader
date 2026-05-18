@@ -235,7 +235,7 @@ void DownloadManager::startJob(int jobId)
     emit activeCountChanged();
 }
 
-QStringList DownloadManager::buildYtDlpArgs(const DownloadJob &j) const
+QStringList DownloadManager::buildYtDlpArgs(const DownloadJob &j)
 {
     QStringList args;
     args << QStringLiteral("--newline")
@@ -289,7 +289,12 @@ QStringList DownloadManager::buildYtDlpArgs(const DownloadJob &j) const
     }
     if (m_settings->cookiesFromBrowser() != QStringLiteral("none")
         && !m_settings->cookiesFromBrowser().isEmpty()) {
-        args << QStringLiteral("--cookies-from-browser") << m_settings->cookiesFromBrowser();
+        // We hand off to CookiesPreparer, which either pre-copies the
+        // Chromium profile to a temp directory (and points yt-dlp at
+        // that copy via `chrome:/abs/path`) or falls back to passing
+        // `--cookies-from-browser <browser>` unchanged.  Either way the
+        // returned args go straight onto the yt-dlp command line.
+        args << m_cookies.prepareArgs(j.id, m_settings->cookiesFromBrowser());
     }
     if (!m_settings->cookiesFile().isEmpty()) {
         args << QStringLiteral("--cookies") << m_settings->cookiesFile();
@@ -467,10 +472,29 @@ void DownloadManager::parseProgressLine(int jobId, const QString &line)
 void DownloadManager::parseStderrLine(int jobId, const QString &line)
 {
     // yt-dlp prints "ERROR: ..." on stderr for actual failures.
+    //
+    // It also prints WARNINGs that, while non-fatal in yt-dlp's eyes,
+    // are very often the root cause of the eventual "Failed" status the
+    // user sees — most notably the cookie-database lock that's so
+    // entrenched it has its own bug tracker entry
+    // (yt-dlp issue 7271).  We hoist that one up into a clear, localised
+    // error key so the QML side can render a useful explanation instead
+    // of the raw English yt-dlp warning text.
     m_model->mergeJob(jobId, [&](DownloadJob &j) {
         j.logTail.append(line);
         j.logTail.append(QChar('\n'));
         if (j.logTail.size() > 65536) j.logTail = j.logTail.right(65536);
+
+        // Cookie-database lock — substring match because yt-dlp prefixes
+        // the message with timestamps / WARNING markers that vary
+        // between versions, and the browser name is interpolated into
+        // the text on some builds ("Chrome", "Edge", ...).
+        if (line.contains(QStringLiteral("Could not copy"), Qt::CaseInsensitive)
+         && line.contains(QStringLiteral("cookie database"),  Qt::CaseInsensitive)) {
+            j.errorKey  = QStringLiteral("error.cookiesLocked");
+            j.errorText = line.trimmed();
+        }
+
         if (line.startsWith(QStringLiteral("ERROR:"))) {
             j.errorText = line.mid(QStringLiteral("ERROR:").size()).trimmed();
         }
@@ -515,6 +539,11 @@ void DownloadManager::onProcessFinished(int jobId, int exitCode, int exitStatus)
         }
     });
 
+    // Drop the per-job cookie snapshot now that yt-dlp is done with it.
+    // Done unconditionally — both the success and failure paths above
+    // are terminal for this job and won't re-read those files.
+    m_cookies.cleanupForJob(jobId);
+
     m_active.remove(jobId);
     emit activeCountChanged();
     pump();
@@ -554,6 +583,7 @@ void DownloadManager::retryJob(int jobId)
             j.status         = DownloadJob::Queued;
             j.statusText     = QStringLiteral("status.queued");
             j.errorText.clear();
+            j.errorKey.clear();
             j.downloadedBytes= 0;
             j.totalBytes     = -1;
             j.progress       = 0.0;

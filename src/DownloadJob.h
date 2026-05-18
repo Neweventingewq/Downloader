@@ -39,6 +39,11 @@ struct DownloadJob
     QString   outputDir;
     QString   formatChoice;   // copied from settings.defaultFormat at enqueue
     QString   errorText;
+    // Optional translation key (e.g. "error.cookiesLocked") that the QML
+    // side can resolve through i18n.t() when it wants to show a friendly
+    // localised message in addition to (or instead of) the raw yt-dlp
+    // line in errorText.  Empty when no specific category was detected.
+    QString   errorKey;
     QDateTime startedAt;
     QDateTime finishedAt;
     QString   logTail;        // last ~64 KB of stderr+stdout for diagnostics

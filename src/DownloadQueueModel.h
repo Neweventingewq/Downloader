@@ -37,6 +37,7 @@ public:
         OutputDirRole,
         FormatChoiceRole,
         ErrorTextRole,
+        ErrorKeyRole,
         StartedAtRole,
         FinishedAtRole,
         LogTailRole,

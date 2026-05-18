@@ -70,9 +70,14 @@ AcrylicCard {
                 }
                 Text {
                     Layout.fillWidth: true
+                    // When we recognised a specific yt-dlp failure mode
+                    // (e.g. cookie-database lock) we surface its localised
+                    // message via errorKey; otherwise fall back to the
+                    // raw yt-dlp error line.
                     text: (model.uploader ? (model.uploader + " · ") : "")
                           + i18n.t(model.statusText || "status.queued")
-                          + (model.errorText ? " — " + model.errorText : "")
+                          + (model.errorKey ? " — " + i18n.t(model.errorKey)
+                                             : (model.errorText ? " — " + model.errorText : ""))
                     color: theme.textSecondary
                     font.family: "Inter, Segoe UI, sans-serif"
                     font.pixelSize: 11

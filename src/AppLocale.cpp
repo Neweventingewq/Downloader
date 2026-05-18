@@ -109,6 +109,16 @@ void Locale::buildTable()
     put(T, "status.failed",         "Ошибка",           "Failed");
     put(T, "status.canceled",       "Отменено",         "Canceled");
 
+    // --- Recognised yt-dlp error categories ------------------------------
+    // These are emitted by DownloadManager::parseStderrLine when it sees
+    // a specific failure signature it can give the user a better
+    // explanation for than yt-dlp's raw English warning text.
+    put(T, "error.cookiesLocked",
+        "Браузер держит базу куки занятой. Закрой Chrome / Edge / Brave полностью "
+        "(включая фоновые процессы в трее) или переключись на Firefox.",
+        "The browser is holding its cookie database locked. Close Chrome / Edge / Brave "
+        "fully (including background tray helpers) or switch to Firefox.");
+
     // --- Settings ---------------------------------------------------------
     put(T, "set.title",          "Настройки",                  "Settings");
     put(T, "set.subtitle",       "Гибкая конфигурация загрузчика.", "Flexible downloader configuration.");
@@ -154,6 +164,13 @@ void Locale::buildTable()
     put(T, "set.retries",        "Повторов при ошибке",        "Retries on error");
     put(T, "set.proxy",          "Прокси (URL)",               "Proxy URL");
     put(T, "set.cookiesBrowser", "Куки из браузера",           "Cookies from browser");
+    put(T, "set.cookiesBrowser.hint",
+        "Chrome / Edge / Brave / Opera блокируют свою базу куки, пока запущены — yt-dlp может не прочитать её. "
+        "Закрой браузер полностью (включая фоновые процессы) перед скачиванием, "
+        "либо переключись на Firefox или используй экспортированный файл ниже.",
+        "Chrome / Edge / Brave / Opera lock their cookie database while running, which can prevent yt-dlp from reading it. "
+        "Close the browser fully (including background helpers) before downloading, "
+        "or switch to Firefox or use an exported cookies file below.");
     put(T, "set.cookiesFile",    "Файл cookies (Netscape)",    "Cookies file (Netscape)");
     put(T, "set.userAgent",      "User-Agent",                 "User-Agent");
 

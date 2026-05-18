@@ -66,7 +66,7 @@ Item {
                                 "jobId","url","title","uploader","thumbnailUrl","durationMs",
                                 "totalBytes","downloadedBytes","speedBps","etaSec","progress",
                                 "status","statusText","outputFile","outputDir","formatChoice",
-                                "errorText","startedAt","finishedAt","logTail","isActive","isTerminal"
+                                "errorText","errorKey","startedAt","finishedAt","logTail","isActive","isTerminal"
                             ]) {
                                 item.model = model
                             }
