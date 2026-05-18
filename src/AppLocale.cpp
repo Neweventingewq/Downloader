@@ -144,6 +144,19 @@ void Locale::buildTable()
         "Chrome 127+ шифрує cookies app-bound ключем, який yt-dlp не може розшифрувати. "
         "Експортуй cookies у файл (наприклад, розширенням «Get cookies.txt LOCALLY») "
         "і вкажи його в полі «Cookies file» нижче, або переключись на Firefox.");
+    // YouTube's anti-bot challenge: identical recommendation to the
+    // cookie failures because in 99% of cases that's exactly what
+    // happened — cookies were either missing or got dropped silently
+    // by the DPAPI failure above.  We keep the message short and
+    // action-oriented; the full background is in Settings → Cookies
+    // from browser hint.
+    put(T, "error.youtubeBotCheck",
+        "YouTube asked yt-dlp to confirm it's not a bot. Pass cookies: either export them "
+        "from your browser to a file (e.g. «Get cookies.txt LOCALLY» extension) and pick it "
+        "in *Settings → Cookies file*, or set *Cookies from browser* to firefox.",
+        "YouTube попросив yt-dlp підтвердити, що це не бот. Передай cookies: або експортуй їх "
+        "із браузера у файл (наприклад, розширенням «Get cookies.txt LOCALLY») і вкажи його в "
+        "*Налаштування → Cookies file*, або встанови *Cookies з браузера* на firefox.");
 
     // --- Settings ---------------------------------------------------------
     put(T, "set.title",          "Settings",                   "Налаштування");

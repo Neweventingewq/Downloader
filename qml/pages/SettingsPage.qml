@@ -374,10 +374,19 @@ Item {
                         }
 
                         Text { text: i18n.t("set.cookiesFile"); color: theme.textSecondary; font.pixelSize: 12; font.family: "Inter, Segoe UI, sans-serif" }
-                        TextFieldA {
+                        FilePickField {
                             Layout.fillWidth: true
-                            text: settings.cookiesFile
-                            onEditingFinished: settings.cookiesFile = text
+                            path: settings.cookiesFile
+                            browseTitle: i18n.t("set.cookiesFile")
+                            // Netscape cookies.txt is the only sensible format here,
+                            // but we keep `All files` as the second filter so users with
+                            // unusual file names (no extension, .cookies, .dat…) still
+                            // see their file in the picker.
+                            nameFilters: [
+                                "Netscape cookies (*.txt cookies.txt)",
+                                "All files (*)"
+                            ]
+                            onFilePicked: function(p) { settings.cookiesFile = p }
                         }
 
                         Text { text: i18n.t("set.userAgent"); color: theme.textSecondary; font.pixelSize: 12; font.family: "Inter, Segoe UI, sans-serif" }
@@ -409,19 +418,29 @@ Item {
                         rowSpacing: 8
 
                         Text { text: i18n.t("set.ytDlpPath"); color: theme.textSecondary; font.pixelSize: 12; font.family: "Inter, Segoe UI, sans-serif" }
-                        TextFieldA {
+                        FilePickField {
                             Layout.fillWidth: true
-                            placeholderText: "/usr/local/bin/yt-dlp"
-                            text: settings.ytDlpPathOverride
-                            onEditingFinished: settings.ytDlpPathOverride = text
+                            path: settings.ytDlpPathOverride
+                            browseTitle: i18n.t("set.ytDlpPath")
+                            nameFilters: [
+                                "yt-dlp executable (yt-dlp yt-dlp.exe)",
+                                "Executables (*.exe)",
+                                "All files (*)"
+                            ]
+                            onFilePicked: function(p) { settings.ytDlpPathOverride = p }
                         }
 
                         Text { text: i18n.t("set.ffmpegPath"); color: theme.textSecondary; font.pixelSize: 12; font.family: "Inter, Segoe UI, sans-serif" }
-                        TextFieldA {
+                        FilePickField {
                             Layout.fillWidth: true
-                            placeholderText: "/usr/bin/ffmpeg"
-                            text: settings.ffmpegPathOverride
-                            onEditingFinished: settings.ffmpegPathOverride = text
+                            path: settings.ffmpegPathOverride
+                            browseTitle: i18n.t("set.ffmpegPath")
+                            nameFilters: [
+                                "ffmpeg executable (ffmpeg ffmpeg.exe)",
+                                "Executables (*.exe)",
+                                "All files (*)"
+                            ]
+                            onFilePicked: function(p) { settings.ffmpegPathOverride = p }
                         }
 
                         Text { text: i18n.t("set.extraArgs"); color: theme.textSecondary; font.pixelSize: 12; font.family: "Inter, Segoe UI, sans-serif" }

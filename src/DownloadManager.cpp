@@ -508,6 +508,22 @@ void DownloadManager::parseStderrLine(int jobId, const QString &line)
             j.errorText = line.trimmed();
         }
 
+        // YouTube anti-bot challenge.  yt-dlp's own message is
+        //   "Sign in to confirm you're not a bot.  Use
+        //    --cookies-from-browser or --cookies for the authentication."
+        // and it usually means either no cookies were supplied or the
+        // cookies that were supplied got rejected (the most common
+        // upstream cause of that is the DPAPI failure above swallowing
+        // the cookie jar silently).  We give the user a single,
+        // actionable sentence — same answer as the cookie errors, just
+        // phrased from YouTube's angle so the row makes sense even
+        // when read in isolation.
+        if (line.contains(QStringLiteral("Sign in to confirm you"),   Qt::CaseInsensitive)
+         && line.contains(QStringLiteral("re not a bot"),             Qt::CaseInsensitive)) {
+            j.errorKey  = QStringLiteral("error.youtubeBotCheck");
+            j.errorText = line.trimmed();
+        }
+
         if (line.startsWith(QStringLiteral("ERROR:"))) {
             j.errorText = line.mid(QStringLiteral("ERROR:").size()).trimmed();
         }
