@@ -1,0 +1,130 @@
+name: Build · Windows .exe
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  windows-exe:
+    runs-on: windows-2025
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Qt 6.8 (MinGW 13.1.0 64-bit) + MinGW toolchain
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.2'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_mingw'
+          modules: 'qtimageformats'
+          tools: 'tools_mingw1310'
+          cache: true
+
+      - name: Put MinGW + Qt on PATH
+        shell: pwsh
+        run: |
+          $mingwBin = (Get-ChildItem -Path "$Env:IQTA_TOOLS\mingw*\bin" -Directory | Select-Object -First 1).FullName
+          if (-not $mingwBin) { throw "MinGW bin not found under $Env:IQTA_TOOLS" }
+          Write-Host "Using MinGW at $mingwBin"
+          "$mingwBin"            | Out-File -FilePath $Env:GITHUB_PATH -Append -Encoding utf8
+          "$Env:QT_ROOT_DIR\bin" | Out-File -FilePath $Env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Configure (Ninja + MinGW g++)
+        shell: pwsh
+        run: |
+          cmake -S . -B build -G "Ninja" `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_C_COMPILER=gcc `
+            -DCMAKE_CXX_COMPILER=g++ `
+            -DCMAKE_MAKE_PROGRAM=ninja
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build build --parallel
+
+      - name: Stage release files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist | Out-Null
+          Copy-Item build/Volchay-Downloader.exe dist/Volchay-Downloader.exe
+          if (Test-Path LICENSE) { Copy-Item LICENSE dist/LICENSE.txt }
+          # README is shipped next to the .exe so the artifact is self-contained.
+          if (Test-Path README.md) { Copy-Item README.md dist/README.md }
+
+      - name: Run windeployqt
+        shell: pwsh
+        run: |
+          $qml = (Resolve-Path "qml").Path
+          # --verbose 2 dumps the full deploy plan into the CI log so we can
+          # see which platform plugin, QML modules and styles ended up next
+          # to the .exe.  -qtpaths makes windeployqt resolve everything from
+          # the Qt install we set up above, not from a stale system Qt.
+          windeployqt `
+            --release `
+            --verbose 2 `
+            --no-translations `
+            --no-compiler-runtime `
+            --qmldir "$qml" `
+            dist/Volchay-Downloader.exe
+
+      - name: Show deployed QML / plugins (sanity)
+        shell: pwsh
+        run: |
+          Write-Host '--- Platform plugins ---'
+          Get-ChildItem dist/platforms -ErrorAction SilentlyContinue
+          Write-Host '--- QtQuick / Controls QML modules ---'
+          Get-ChildItem dist -Recurse -Filter qmldir | Select-Object FullName
+
+      - name: Bundle MinGW runtime DLLs
+        shell: pwsh
+        run: |
+          $mingwBin = (Get-ChildItem -Path "$Env:IQTA_TOOLS\mingw*\bin" -Directory | Select-Object -First 1).FullName
+          foreach ($name in @('libgcc_s_seh-1.dll', 'libstdc++-6.dll', 'libwinpthread-1.dll')) {
+            $src = Join-Path $mingwBin $name
+            if (Test-Path $src) { Copy-Item $src dist/ }
+          }
+
+      - name: Download yt-dlp.exe
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -UseBasicParsing `
+            -Uri 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe' `
+            -OutFile dist/yt-dlp.exe
+          Get-Item dist/yt-dlp.exe
+
+      - name: Download ffmpeg.exe (essentials build)
+        shell: pwsh
+        run: |
+          $url = 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip'
+          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile ffmpeg.zip
+          Expand-Archive -Path ffmpeg.zip -DestinationPath ffmpeg_tmp -Force
+          $exe = Get-ChildItem -Recurse -Path ffmpeg_tmp -Filter ffmpeg.exe   | Select-Object -First 1
+          $ffp = Get-ChildItem -Recurse -Path ffmpeg_tmp -Filter ffprobe.exe  | Select-Object -First 1
+          if ($exe) { Copy-Item $exe.FullName dist/ffmpeg.exe }
+          if ($ffp) { Copy-Item $ffp.FullName dist/ffprobe.exe }
+          Remove-Item -Recurse -Force ffmpeg_tmp, ffmpeg.zip
+
+      - name: Inspect dist
+        shell: pwsh
+        run: |
+          Get-ChildItem dist -Recurse | Select-Object FullName, Length
+
+      - name: Pack zip
+        shell: pwsh
+        run: |
+          $tag = (Get-Date -Format 'yyyyMMdd-HHmmss')
+          Compress-Archive -Path dist/* -DestinationPath ("Volchay-Downloader-windows-x64-{0}.zip" -f $tag)
+          Get-ChildItem *.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Volchay-Downloader-windows-x64
+          path: Volchay-Downloader-windows-x64-*.zip
+          if-no-files-found: error
+          retention-days: 30

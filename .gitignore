@@ -1,0 +1,51 @@
+# Build outputs
+build/
+build-*/
+dist/
+deploy/
+out/
+*.user
+*.user.*
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# Qt / IDE
+*.autosave
+.qtc_clangd/
+.idea/
+.vscode/
+.vs/
+*.qmlproject.user
+
+# Compiled
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.exe
+*.a
+*.lib
+*.exp
+*.pdb
+*.ilk
+
+# OS junk
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Python cache (used by helper scripts)
+__pycache__/
+*.pyc
+
+# Runtime data
+*.log
+.tmp/
+.cache/

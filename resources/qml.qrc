@@ -1,0 +1,34 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/qml">
+        <file alias="Main.qml">../qml/Main.qml</file>
+
+        <file alias="components/AcrylicBackground.qml">../qml/components/AcrylicBackground.qml</file>
+        <file alias="components/AcrylicCard.qml">../qml/components/AcrylicCard.qml</file>
+        <file alias="components/TitleBar.qml">../qml/components/TitleBar.qml</file>
+        <file alias="components/SidebarItem.qml">../qml/components/SidebarItem.qml</file>
+        <file alias="components/SidebarIcon.qml">../qml/components/SidebarIcon.qml</file>
+        <file alias="components/AmberButton.qml">../qml/components/AmberButton.qml</file>
+        <file alias="components/GhostButton.qml">../qml/components/GhostButton.qml</file>
+        <file alias="components/AppLogo.qml">../qml/components/AppLogo.qml</file>
+        <file alias="components/StatusToast.qml">../qml/components/StatusToast.qml</file>
+        <file alias="components/SectionHeader.qml">../qml/components/SectionHeader.qml</file>
+        <file alias="components/TextFieldA.qml">../qml/components/TextFieldA.qml</file>
+        <file alias="components/PathField.qml">../qml/components/PathField.qml</file>
+        <file alias="components/ComboField.qml">../qml/components/ComboField.qml</file>
+        <file alias="components/SwitchA.qml">../qml/components/SwitchA.qml</file>
+        <file alias="components/NumberField.qml">../qml/components/NumberField.qml</file>
+        <file alias="components/ProgressBar.qml">../qml/components/ProgressBar.qml</file>
+        <file alias="components/QueueItemCard.qml">../qml/components/QueueItemCard.qml</file>
+
+        <file alias="pages/HomePage.qml">../qml/pages/HomePage.qml</file>
+        <file alias="pages/QueuePage.qml">../qml/pages/QueuePage.qml</file>
+        <file alias="pages/HistoryPage.qml">../qml/pages/HistoryPage.qml</file>
+        <file alias="pages/SettingsPage.qml">../qml/pages/SettingsPage.qml</file>
+        <file alias="pages/AboutPage.qml">../qml/pages/AboutPage.qml</file>
+    </qresource>
+    <qresource prefix="/icons">
+        <file alias="app.png">icons/app.png</file>
+        <file alias="app.ico">icons/app.ico</file>
+    </qresource>
+</RCC>
