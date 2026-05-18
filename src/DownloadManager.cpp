@@ -350,15 +350,26 @@ QStringList DownloadManager::buildYtDlpArgs(const DownloadJob &j)
 QString DownloadManager::resolveFormatSpec(const QString &choice, const QString &container)
 {
     Q_UNUSED(container);
+    // Universal fallback appended to every chain: if YouTube returns a
+    // weird format set for a specific video (live event, premiere,
+    // members-only with stripped formats, etc.) and none of the
+    // preferred combinations match, we'd rather end up with *some*
+    // stream than fail with "Requested format is not available".  The
+    // `b` token at the very end is yt-dlp's alias for `best` and
+    // matches the single best-quality stream regardless of
+    // height/container, which is the safest "give me anything" net.
     if (choice == QStringLiteral("best")) {
-        return QStringLiteral("bv*+ba/b");
+        return QStringLiteral("bv*+ba/b/best");
     }
     bool isNumeric = false;
     const int h = choice.toInt(&isNumeric);
     if (isNumeric && h > 0) {
-        return QString("bv*[height<=%1]+ba/b[height<=%1]/b").arg(h);
+        // The height-bounded selectors come first (we honour the
+        // user's quality cap when possible) and the unbounded
+        // bv*+ba/b/best comes last as the safety net.
+        return QString("bv*[height<=%1]+ba/b[height<=%1]/bv*+ba/b/best").arg(h);
     }
-    return QStringLiteral("bv*+ba/b");
+    return QStringLiteral("bv*+ba/b/best");
 }
 
 // ---------------------------------------------------------------------------
@@ -505,6 +516,21 @@ void DownloadManager::parseStderrLine(int jobId, const QString &line)
         if (line.contains(QStringLiteral("Failed to decrypt"), Qt::CaseInsensitive)
          && line.contains(QStringLiteral("DPAPI"),             Qt::CaseInsensitive)) {
             j.errorKey  = QStringLiteral("error.cookiesDpapi");
+            j.errorText = line.trimmed();
+        }
+
+        // "Requested format is not available" — yt-dlp went through
+        // every fallback in our -f chain and none of them matched.
+        // Usually means the user picked a height cap (e.g. 1080p)
+        // and this particular video has no formats at all, only
+        // live/premiere/DRM placeholders, or a very narrow preferred
+        // codec was set.  We surface a localised hint to widen the
+        // selector via Settings; with the safer chain in
+        // resolveFormatSpec() (which now always ends with bv*+ba/b/best)
+        // this should be rare, but it can still happen for live
+        // streams and members-only manifests.
+        if (line.contains(QStringLiteral("Requested format is not available"), Qt::CaseInsensitive)) {
+            j.errorKey  = QStringLiteral("error.formatNotAvailable");
             j.errorText = line.trimmed();
         }
 

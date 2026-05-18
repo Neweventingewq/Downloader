@@ -157,6 +157,18 @@ void Locale::buildTable()
         "YouTube попросив yt-dlp підтвердити, що це не бот. Передай cookies: або експортуй їх "
         "із браузера у файл (наприклад, розширенням «Get cookies.txt LOCALLY») і вкажи його в "
         "*Налаштування → Cookies file*, або встанови *Cookies з браузера* на firefox.");
+    // No format matched our -f chain.  resolveFormatSpec() now always
+    // appends a `b/best` safety net, so this should be rare — but
+    // live streams, premieres and members-only manifests can still
+    // hit it.  The actionable suggestion is to widen the quality
+    // setting and turn off the free-codecs filter.
+    put(T, "error.formatNotAvailable",
+        "yt-dlp could not find a downloadable format for this video. Try *Settings → Default quality = "
+        "Best available* and turn off *Prefer free codecs*; for live streams / premieres this may simply "
+        "mean the stream isn't accessible to non-members.",
+        "yt-dlp не знайшов формату для завантаження цього відео. Спробуй *Налаштування → Якість за "
+        "замовчуванням = Максимум* і вимкни *Надавати перевагу вільним кодекам*; для трансляцій / "
+        "прем'єр це може означати, що потік просто недоступний без членства.");
 
     // --- Settings ---------------------------------------------------------
     put(T, "set.title",          "Settings",                   "Налаштування");
