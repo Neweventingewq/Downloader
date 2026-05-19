@@ -21,12 +21,16 @@
 #include <cstdlib>
 #include <exception>
 
+#include <QtWebEngineQuick/QtWebEngineQuick>
+#include <QWebEngineProfile>
+
 #include "DownloadManager.h"
 #include "DownloadQueueModel.h"
 #include "Settings.h"
 #include "Theme.h"
 #include "ToolsLocator.h"
 #include "AppLocale.h"
+#include "CookieJar.h"
 
 // ---------------------------------------------------------------------------
 // File-based logger.
@@ -157,6 +161,12 @@ int main(int argc, char *argv[])
         fmt.setSwapInterval(1);
         QSurfaceFormat::setDefaultFormat(fmt);
 
+        // QtWebEngineQuick::initialize MUST run before QGuiApplication is
+        // constructed: WebEngine installs a custom Chromium QPA-aware
+        // event dispatcher that needs to be in place before any QObject
+        // begins listening for events.  Documented hard requirement.
+        QtWebEngineQuick::initialize();
+
         QGuiApplication app(argc, argv);
         QGuiApplication::setWindowIcon(QIcon(QStringLiteral(":/icons/app.png")));
 
@@ -178,8 +188,12 @@ int main(int argc, char *argv[])
         Theme              theme(&settings);
         ToolsLocator       tools;
         DownloadQueueModel queueModel;
-        DownloadManager    manager(&settings, &tools, &queueModel);
+        CookieJar          cookieJar;
+        DownloadManager    manager(&settings, &tools, &queueModel, &cookieJar);
         qInfo() << "Core services ready.";
+        qInfo().noquote() << "WebEngine profile path :"
+                          << (cookieJar.profile() ? cookieJar.profile()->persistentStoragePath()
+                                                  : QStringLiteral("<none>"));
 
         QQmlApplicationEngine engine;
         QObject::connect(&engine, &QQmlApplicationEngine::warnings,
@@ -202,6 +216,7 @@ int main(int argc, char *argv[])
         ctx->setContextProperty(QStringLiteral("theme"),    &theme);
         ctx->setContextProperty(QStringLiteral("tools"),    &tools);
         ctx->setContextProperty(QStringLiteral("i18n"),     &locale);
+        ctx->setContextProperty(QStringLiteral("cookieJar"), &cookieJar);
 
         // Re-evaluate every binding that touches i18n.t(...) when the user
         // changes language. QML cannot infer this dependency from a plain

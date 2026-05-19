@@ -250,6 +250,43 @@ void Locale::buildTable()
         "та вкажи його в полі «Cookies file» нижче, або переключись на Firefox.");
     put(T, "set.cookiesFile",    "Cookies file (Netscape)",    "Файл cookies (Netscape)");
     put(T, "set.userAgent",      "User-Agent",                 "User-Agent");
+    put(T, "set.politeSleep",    "Polite-mode pause (sec)",    "Пауза «ввічливого режиму» (сек)");
+    put(T, "set.politeSleep.hint",
+        "Seconds yt-dlp waits between HTTP requests. A small pause (3 sec is plenty) "
+        "is enough to keep YouTube's anti-bot heuristics off a logged-in account, "
+        "especially important if you own a large channel.",
+        "Секунди, які yt-dlp чекає між HTTP-запитами. Невелика пауза (достатньо 3 сек) "
+        "тримає твій акаунт поза антибот-евристикою YouTube — особливо важливо, якщо "
+        "у тебе великий канал.");
+
+    // --- Sign-in card ------------------------------------------------------
+    put(T, "set.section.signin", "YouTube sign-in",          "Вхід у YouTube");
+    put(T, "signin.title",       "Sign in to YouTube",       "Увійти у YouTube");
+    put(T, "signin.youtube",     "YouTube account",          "Акаунт YouTube");
+    put(T, "signin.warning",
+        "Do not use your main Google account. Create a separate account for downloads "
+        "(accounts.google.com/signup) — that way if YouTube ever flags this session, "
+        "you'll only lose a throwaway account, not your channel.",
+        "Не використовуй основний акаунт Google. Заведи окремий під завантаження "
+        "(accounts.google.com/signup) — якщо YouTube колись помітить цю сесію, "
+        "втратиш одноразовий акаунт, а не свій канал.");
+    put(T, "signin.hint",
+        "Once signed in, the app reuses these cookies for every YouTube download — no "
+        "exporting files, no Chrome closing. Cookies are stored only inside this app's "
+        "data folder and are isolated from your system browsers.",
+        "Після входу додаток використовуватиме ці cookies для кожного завантаження "
+        "YouTube — без експорту файлів, без закриття Chrome. Cookies зберігаються лише "
+        "в папці даних цього додатка і не пов'язані з твоїми системними браузерами.");
+    put(T, "signin.status.signedin",    "Signed in",                 "Підключено");
+    put(T, "signin.status.notsignedin", "Not signed in",             "Не підключено");
+    put(T, "signin.button.signin",      "Sign in",                   "Увійти");
+    put(T, "signin.button.signinAgain", "Sign in again",             "Увійти ще раз");
+    put(T, "signin.button.signout",     "Sign out",                  "Вийти");
+    put(T, "signin.button.close",       "Close",                     "Закрити");
+    put(T, "signin.window.signedin",    "Signed in — you can close this window.",
+                                         "Підключено — це вікно можна закрити.");
+    put(T, "signin.window.notyet",      "Log in with your secondary Google account.",
+                                         "Увійди вторинним акаунтом Google.");
 
     put(T, "set.ytDlpPath",      "Path to yt-dlp",             "Шлях до yt-dlp");
     put(T, "set.ffmpegPath",     "Path to ffmpeg",             "Шлях до ffmpeg");

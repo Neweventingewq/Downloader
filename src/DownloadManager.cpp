@@ -2,6 +2,7 @@
 #include "DownloadQueueModel.h"
 #include "Settings.h"
 #include "ToolsLocator.h"
+#include "CookieJar.h"
 
 #include <QClipboard>
 #include <QDateTime>
@@ -68,11 +69,13 @@ double parseDoubleOr0(const QString &s)
 DownloadManager::DownloadManager(Settings *settings,
                                  ToolsLocator *tools,
                                  DownloadQueueModel *model,
+                                 CookieJar *cookieJar,
                                  QObject *parent)
     : QObject(parent),
       m_settings(settings),
       m_tools(tools),
-      m_model(model)
+      m_model(model),
+      m_cookieJar(cookieJar)
 {
     if (m_tools) m_tools->setSettings(m_settings);
     if (m_settings) {
@@ -284,20 +287,45 @@ QStringList DownloadManager::buildYtDlpArgs(const DownloadJob &j)
              << (QString::number(m_settings->speedLimitKBps()) + QStringLiteral("K"));
     }
     args << QStringLiteral("--retries") << QString::number(m_settings->retries());
+
+    // Polite-mode pause: spaces requests out so YouTube doesn't tag the
+    // session as bot traffic.  Critical for users with large channels
+    // signed in to their account — even a couple of seconds between
+    // requests reliably keeps the account out of rate-limit jail.
+    const int sleepSec = m_settings->politeSleepSec();
+    if (sleepSec > 0) {
+        const QString v = QString::number(sleepSec);
+        args << QStringLiteral("--sleep-requests") << v
+             << QStringLiteral("--sleep-interval")  << v
+             << QStringLiteral("--max-sleep-interval") << v;
+    }
+
     if (!m_settings->proxyUrl().isEmpty()) {
         args << QStringLiteral("--proxy") << m_settings->proxyUrl();
     }
-    if (m_settings->cookiesFromBrowser() != QStringLiteral("none")
-        && !m_settings->cookiesFromBrowser().isEmpty()) {
+    // Priority order for credentials:
+    //   1. CookieJar — the in-app QtWebEngine profile the user logged in
+    //      with via Settings -> Sign in.  Fresh on every launch, never
+    //      hits Chrome's DPAPI / file-lock paths, never asks the user to
+    //      paste a file path.  Wins over everything else when present.
+    //   2. Manual cookies.txt (Settings -> Cookies file).
+    //   3. cookies-from-browser via CookiesPreparer (live browser DB).
+    QString jarFile;
+    if (m_cookieJar) {
+        jarFile = m_cookieJar->exportYouTubeCookiesNetscape();
+    }
+    if (!jarFile.isEmpty()) {
+        args << QStringLiteral("--cookies") << jarFile;
+    } else if (!m_settings->cookiesFile().isEmpty()) {
+        args << QStringLiteral("--cookies") << m_settings->cookiesFile();
+    } else if (m_settings->cookiesFromBrowser() != QStringLiteral("none")
+               && !m_settings->cookiesFromBrowser().isEmpty()) {
         // We hand off to CookiesPreparer, which either pre-copies the
         // Chromium profile to a temp directory (and points yt-dlp at
         // that copy via `chrome:/abs/path`) or falls back to passing
         // `--cookies-from-browser <browser>` unchanged.  Either way the
         // returned args go straight onto the yt-dlp command line.
         args << m_cookies.prepareArgs(j.id, m_settings->cookiesFromBrowser());
-    }
-    if (!m_settings->cookiesFile().isEmpty()) {
-        args << QStringLiteral("--cookies") << m_settings->cookiesFile();
     }
     if (!m_settings->userAgent().isEmpty()) {
         args << QStringLiteral("--user-agent") << m_settings->userAgent();

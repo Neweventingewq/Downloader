@@ -58,6 +58,7 @@ void Settings::load()
     m_cookiesFromBrowser = s.value("net/cookiesBrowser",  m_cookiesFromBrowser).toString();
     m_cookiesFile        = s.value("net/cookiesFile",     m_cookiesFile).toString();
     m_userAgent          = s.value("net/userAgent",       m_userAgent).toString();
+    m_politeSleepSec     = s.value("net/politeSleep",     m_politeSleepSec).toInt();
     m_ytDlpPathOverride  = s.value("adv/ytDlpPath",       m_ytDlpPathOverride).toString();
     m_ffmpegPathOverride = s.value("adv/ffmpegPath",      m_ffmpegPathOverride).toString();
     m_extraArgs          = s.value("adv/extraArgs",       m_extraArgs).toString();
@@ -119,6 +120,12 @@ void Settings::setProxyUrl(const QString &v)          { VD_DEFINE_SETTER(setProx
 void Settings::setCookiesFromBrowser(const QString &v){ VD_DEFINE_SETTER(setCookiesFromBrowser, cookiesFromBrowser, cookiesFromBrowserChanged, "net/cookiesBrowser") }
 void Settings::setCookiesFile(const QString &v)       { VD_DEFINE_SETTER(setCookiesFile, cookiesFile, cookiesFileChanged, "net/cookiesFile") }
 void Settings::setUserAgent(const QString &v)         { VD_DEFINE_SETTER(setUserAgent, userAgent, userAgentChanged, "net/userAgent") }
+void Settings::setPoliteSleepSec(int v)
+{
+    if (v < 0)  v = 0;
+    if (v > 30) v = 30;
+    VD_DEFINE_SETTER(setPoliteSleepSec, politeSleepSec, politeSleepSecChanged, "net/politeSleep")
+}
 void Settings::setYtDlpPathOverride(const QString &v) { VD_DEFINE_SETTER(setYtDlpPathOverride, ytDlpPathOverride, ytDlpPathOverrideChanged, "adv/ytDlpPath") }
 void Settings::setFfmpegPathOverride(const QString &v){ VD_DEFINE_SETTER(setFfmpegPathOverride, ffmpegPathOverride, ffmpegPathOverrideChanged, "adv/ffmpegPath") }
 void Settings::setExtraArgs(const QString &v)         { VD_DEFINE_SETTER(setExtraArgs, extraArgs, extraArgsChanged, "adv/extraArgs") }
@@ -150,13 +157,14 @@ void Settings::resetToDefaults()
     m_embedMetadata      = true;
     m_embedChapters      = true;
     m_sponsorblock       = false;
-    m_maxConcurrent      = 2;
+    m_maxConcurrent      = 1;
     m_speedLimitKBps     = 0;
     m_retries            = 10;
     m_proxyUrl.clear();
     m_cookiesFromBrowser = QStringLiteral("none");
     m_cookiesFile.clear();
     m_userAgent.clear();
+    m_politeSleepSec     = 3;
     m_ytDlpPathOverride.clear();
     m_ffmpegPathOverride.clear();
     m_extraArgs.clear();
@@ -188,6 +196,7 @@ void Settings::resetToDefaults()
     emit cookiesFromBrowserChanged();
     emit cookiesFileChanged();
     emit userAgentChanged();
+    emit politeSleepSecChanged();
     emit ytDlpPathOverrideChanged();
     emit ffmpegPathOverrideChanged();
     emit extraArgsChanged();

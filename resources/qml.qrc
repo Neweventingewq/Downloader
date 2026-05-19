@@ -21,6 +21,7 @@
         <file alias="components/NumberField.qml">../qml/components/NumberField.qml</file>
         <file alias="components/ProgressBar.qml">../qml/components/ProgressBar.qml</file>
         <file alias="components/QueueItemCard.qml">../qml/components/QueueItemCard.qml</file>
+        <file alias="components/LoginWindow.qml">../qml/components/LoginWindow.qml</file>
 
         <file alias="pages/HomePage.qml">../qml/pages/HomePage.qml</file>
         <file alias="pages/QueuePage.qml">../qml/pages/QueuePage.qml</file>

@@ -23,6 +23,8 @@ find_package(Qt6 6.2 REQUIRED COMPONENTS
     Quick
     QuickControls2
     Network
+    WebEngineQuick
+    WebEngineCore
 )
 
 # ----------------------------------------------------------------------------
@@ -31,6 +33,7 @@ find_package(Qt6 6.2 REQUIRED COMPONENTS
 set(VD_SOURCES
     src/main.cpp
     src/CookiesPreparer.cpp
+    src/CookieJar.cpp
     src/DownloadManager.cpp
     src/DownloadQueueModel.cpp
     src/DownloadJob.cpp
@@ -42,6 +45,7 @@ set(VD_SOURCES
 
 set(VD_HEADERS
     src/CookiesPreparer.h
+    src/CookieJar.h
     src/DownloadManager.h
     src/DownloadQueueModel.h
     src/DownloadJob.h
@@ -72,6 +76,8 @@ target_link_libraries(VolchayDownloader PRIVATE
     Qt6::Quick
     Qt6::QuickControls2
     Qt6::Network
+    Qt6::WebEngineQuick
+    Qt6::WebEngineCore
 )
 
 set_target_properties(VolchayDownloader PROPERTIES
