@@ -53,6 +53,7 @@ class Settings : public QObject
     Q_PROPERTY(QString cookiesFromBrowser  READ cookiesFromBrowser  WRITE setCookiesFromBrowser  NOTIFY cookiesFromBrowserChanged)
     Q_PROPERTY(QString cookiesFile         READ cookiesFile         WRITE setCookiesFile         NOTIFY cookiesFileChanged)
     Q_PROPERTY(QString userAgent           READ userAgent           WRITE setUserAgent           NOTIFY userAgentChanged)
+    Q_PROPERTY(int     politeSleepSec      READ politeSleepSec      WRITE setPoliteSleepSec      NOTIFY politeSleepSecChanged)
 
     // Advanced
     Q_PROPERTY(QString ytDlpPathOverride READ ytDlpPathOverride WRITE setYtDlpPathOverride NOTIFY ytDlpPathOverrideChanged)
@@ -127,6 +128,8 @@ public:
     void    setCookiesFile(const QString &v);
     QString userAgent() const { return m_userAgent; }
     void    setUserAgent(const QString &v);
+    int     politeSleepSec() const { return m_politeSleepSec; }
+    void    setPoliteSleepSec(int v);
 
     // -- Advanced --
     QString ytDlpPathOverride() const { return m_ytDlpPathOverride; }
@@ -176,6 +179,7 @@ signals:
     void cookiesFromBrowserChanged();
     void cookiesFileChanged();
     void userAgentChanged();
+    void politeSleepSecChanged();
     void ytDlpPathOverrideChanged();
     void ffmpegPathOverrideChanged();
     void extraArgsChanged();
@@ -214,13 +218,14 @@ private:
     bool    m_sponsorblock     = false;
 
     // Network / runtime
-    int     m_maxConcurrent      = 2;
+    int     m_maxConcurrent      = 1;  // Safer default for a logged-in account: 1 stream at a time avoids YouTube's parallel-request bot heuristics.
     int     m_speedLimitKBps     = 0;
     int     m_retries            = 10;
     QString m_proxyUrl;
     QString m_cookiesFromBrowser = QStringLiteral("none");      // none/chrome/firefox/edge/brave/opera/vivaldi/safari
     QString m_cookiesFile;
     QString m_userAgent;
+    int     m_politeSleepSec     = 3;   // Polite-mode pause between yt-dlp HTTP requests; protects logged-in accounts from rate-limits.
 
     // Advanced
     QString m_ytDlpPathOverride;

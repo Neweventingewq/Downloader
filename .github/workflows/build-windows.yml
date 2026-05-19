@@ -3,8 +3,10 @@ name: Build · Windows .exe
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
+  # Run on every PR regardless of target branch so stacked PRs
+  # (branch -> branch -> main) still get CI feedback before the
+  # first branch lands.
+  pull_request: {}
   workflow_dispatch: {}
 
 jobs:
@@ -14,34 +16,39 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Qt 6.8 (MinGW 13.1.0 64-bit) + MinGW toolchain
+      # We must switch the Windows compiler from MinGW to MSVC for
+      # this branch: Qt does NOT ship pre-built QtWebEngine binaries
+      # for MinGW on Windows.  WebEngine is only available with the
+      # win64_msvc2022_64 distribution.  install-qt-action handles
+      # the 6.8+ "qtwebengine moved to extensions" repo layout via
+      # aqtinstall >= 3.2.
+      - name: Install Qt 6.8 (MSVC 2022 64-bit) + QtWebEngine
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.2'
           host: 'windows'
           target: 'desktop'
-          arch: 'win64_mingw'
-          modules: 'qtimageformats'
-          tools: 'tools_mingw1310'
+          arch: 'win64_msvc2022_64'
+          modules: 'qtimageformats qtwebengine qtwebchannel qtpositioning'
           cache: true
 
-      - name: Put MinGW + Qt on PATH
+      - name: Setup MSVC dev environment (cl, link, nmake, ninja)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Put Qt on PATH
         shell: pwsh
         run: |
-          $mingwBin = (Get-ChildItem -Path "$Env:IQTA_TOOLS\mingw*\bin" -Directory | Select-Object -First 1).FullName
-          if (-not $mingwBin) { throw "MinGW bin not found under $Env:IQTA_TOOLS" }
-          Write-Host "Using MinGW at $mingwBin"
-          "$mingwBin"            | Out-File -FilePath $Env:GITHUB_PATH -Append -Encoding utf8
           "$Env:QT_ROOT_DIR\bin" | Out-File -FilePath $Env:GITHUB_PATH -Append -Encoding utf8
 
-      - name: Configure (Ninja + MinGW g++)
+      - name: Configure (Ninja + MSVC cl)
         shell: pwsh
         run: |
           cmake -S . -B build -G "Ninja" `
             -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_C_COMPILER=gcc `
-            -DCMAKE_CXX_COMPILER=g++ `
-            -DCMAKE_MAKE_PROGRAM=ninja
+            -DCMAKE_C_COMPILER=cl `
+            -DCMAKE_CXX_COMPILER=cl
 
       - name: Build
         shell: pwsh
@@ -60,15 +67,19 @@ jobs:
         shell: pwsh
         run: |
           $qml = (Resolve-Path "qml").Path
-          # --verbose 2 dumps the full deploy plan into the CI log so we can
-          # see which platform plugin, QML modules and styles ended up next
-          # to the .exe.  -qtpaths makes windeployqt resolve everything from
-          # the Qt install we set up above, not from a stale system Qt.
+          # --verbose 2 dumps the full deploy plan into the CI log so we
+          # can see which platform plugin, QML modules and styles ended
+          # up next to the .exe.  --webenginecore makes windeployqt drop
+          # in the QtWebEngineProcess.exe + locales/resources Chromium
+          # requires at runtime (without this the WebView won't render).
+          # --compiler-runtime brings the MSVC redistributable next to
+          # the .exe so users without VS installed can still launch.
           windeployqt `
             --release `
             --verbose 2 `
             --no-translations `
-            --no-compiler-runtime `
+            --compiler-runtime `
+            --webenginecore `
             --qmldir "$qml" `
             dist/Volchay-Downloader.exe
 
@@ -79,15 +90,9 @@ jobs:
           Get-ChildItem dist/platforms -ErrorAction SilentlyContinue
           Write-Host '--- QtQuick / Controls QML modules ---'
           Get-ChildItem dist -Recurse -Filter qmldir | Select-Object FullName
-
-      - name: Bundle MinGW runtime DLLs
-        shell: pwsh
-        run: |
-          $mingwBin = (Get-ChildItem -Path "$Env:IQTA_TOOLS\mingw*\bin" -Directory | Select-Object -First 1).FullName
-          foreach ($name in @('libgcc_s_seh-1.dll', 'libstdc++-6.dll', 'libwinpthread-1.dll')) {
-            $src = Join-Path $mingwBin $name
-            if (Test-Path $src) { Copy-Item $src dist/ }
-          }
+          Write-Host '--- WebEngine artifacts ---'
+          Get-ChildItem dist -Recurse -Filter 'QtWebEngineProcess.exe' | Select-Object FullName
+          Get-ChildItem dist -Recurse -Filter 'icudtl.dat' | Select-Object FullName
 
       - name: Download yt-dlp.exe
         shell: pwsh

@@ -11,6 +11,7 @@
 class Settings;
 class ToolsLocator;
 class DownloadQueueModel;
+class CookieJar;
 class QProcess;
 
 // Drives the actual download operation by spawning yt-dlp as a child
@@ -36,6 +37,7 @@ public:
     DownloadManager(Settings *settings,
                     ToolsLocator *tools,
                     DownloadQueueModel *model,
+                    CookieJar *cookieJar,
                     QObject *parent = nullptr);
     ~DownloadManager() override;
 
@@ -100,6 +102,7 @@ private:
     Settings           *m_settings  = nullptr;
     ToolsLocator       *m_tools     = nullptr;
     DownloadQueueModel *m_model     = nullptr;
+    CookieJar          *m_cookieJar = nullptr;
 
     int                 m_nextId    = 1;
     QHash<int, Active>  m_active;
