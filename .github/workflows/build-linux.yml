@@ -3,8 +3,10 @@ name: Build · Linux smoke
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
+  # Run on every PR regardless of target branch so stacked PRs
+  # (branch -> branch -> main) still get CI feedback before the
+  # first branch lands.
+  pull_request: {}
   workflow_dispatch: {}
 
 jobs:
