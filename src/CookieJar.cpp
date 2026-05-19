@@ -84,14 +84,26 @@ bool CookieJar::isGoogleDomain(const QString &domain)
 
 bool CookieJar::isAuthCookieName(const QString &name)
 {
-    // The cookies Google sets on successful YouTube login.  Any one
-    // of these means "the user is logged in to Google"; we don't try
-    // to disambiguate between accounts.
+    // The cookies Google/YouTube set on successful sign-in.  Any one
+    // of these means "the user is logged in"; we don't try to
+    // disambiguate between accounts.
+    //
+    // Important: LOGIN_INFO is set by *YouTube* (on .youtube.com)
+    // and is what yt-dlp's own logged-in heuristic looks for.  Earlier
+    // builds missed it and showed "Not signed in" for users who'd
+    // clearly logged in successfully.
     return name == QLatin1String("__Secure-3PSID")
         || name == QLatin1String("__Secure-1PSID")
-        || name == QLatin1String("SID")
         || name == QLatin1String("__Secure-3PSIDTS")
-        || name == QLatin1String("__Secure-1PSIDTS");
+        || name == QLatin1String("__Secure-1PSIDTS")
+        || name == QLatin1String("__Secure-3PAPISID")
+        || name == QLatin1String("__Secure-1PAPISID")
+        || name == QLatin1String("SID")
+        || name == QLatin1String("HSID")
+        || name == QLatin1String("SSID")
+        || name == QLatin1String("APISID")
+        || name == QLatin1String("SAPISID")
+        || name == QLatin1String("LOGIN_INFO");
 }
 
 void CookieJar::onCookieAdded(const QNetworkCookie &c)
@@ -102,12 +114,12 @@ void CookieJar::onCookieAdded(const QNetworkCookie &c)
         const QNetworkCookie &x = m_cookies[i];
         if (x.name() == c.name() && x.domain() == c.domain() && x.path() == c.path()) {
             m_cookies[i] = c;
-            recomputeLoginState();
+            recomputeState();
             return;
         }
     }
     m_cookies.append(c);
-    recomputeLoginState();
+    recomputeState();
 }
 
 void CookieJar::onCookieRemoved(const QNetworkCookie &c)
@@ -116,25 +128,52 @@ void CookieJar::onCookieRemoved(const QNetworkCookie &c)
         const QNetworkCookie &x = m_cookies[i];
         if (x.name() == c.name() && x.domain() == c.domain() && x.path() == c.path()) {
             m_cookies.removeAt(i);
-            recomputeLoginState();
+            recomputeState();
             return;
         }
     }
 }
 
-void CookieJar::recomputeLoginState()
+void CookieJar::recomputeState()
 {
     bool logged = false;
+    int  count  = 0;
     for (const QNetworkCookie &c : std::as_const(m_cookies)) {
-        if (isGoogleDomain(c.domain()) && isAuthCookieName(QString::fromUtf8(c.name()))) {
+        if (!isGoogleDomain(c.domain())) continue;
+        ++count;
+        if (!logged && isAuthCookieName(QString::fromUtf8(c.name()))) {
             logged = true;
-            break;
         }
     }
     if (logged != m_youtubeLoggedIn) {
         m_youtubeLoggedIn = logged;
         emit youtubeLoggedInChanged();
     }
+    if (count != m_trackedCookieCount) {
+        m_trackedCookieCount = count;
+        emit trackedCookieCountChanged();
+    }
+}
+
+void CookieJar::refresh()
+{
+    // Wipe our shadow copy and ask the cookie store to re-emit
+    // cookieAdded for every cookie it currently holds.  This is the
+    // canonical "resync me with the on-disk store" sequence — used
+    // when the user closes LoginWindow or revisits Settings, in case
+    // one of the just-set auth cookies came in after the previous
+    // signal pump round.
+    if (!m_profile) return;
+    m_cookies.clear();
+    if (m_youtubeLoggedIn) {
+        m_youtubeLoggedIn = false;
+        emit youtubeLoggedInChanged();
+    }
+    if (m_trackedCookieCount != 0) {
+        m_trackedCookieCount = 0;
+        emit trackedCookieCountChanged();
+    }
+    m_profile->cookieStore()->loadAllCookies();
 }
 
 QString CookieJar::exportYouTubeCookiesNetscape()

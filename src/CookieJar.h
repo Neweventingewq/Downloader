@@ -25,9 +25,16 @@ class CookieJar : public QObject
 {
     Q_OBJECT
 
-    // True when at least one Google session auth cookie is present
-    // (one of: __Secure-3PSID, __Secure-1PSID, SID).
+    // True when at least one Google/YouTube session auth cookie is
+    // present.  See isAuthCookieName() in the .cpp for the exact list.
     Q_PROPERTY(bool youtubeLoggedIn READ youtubeLoggedIn NOTIFY youtubeLoggedInChanged)
+
+    // Number of cookies currently tracked for YouTube/Google/googlevideo
+    // domains.  Useful purely as a diagnostic — surfaced in Settings
+    // so the user can see whether anything was captured from the
+    // sign-in flow even when the login-state heuristic decides "not
+    // signed in".
+    Q_PROPERTY(int trackedCookieCount READ trackedCookieCount NOTIFY trackedCookieCountChanged)
 
     // The WebEngine profile bound to this jar.  Exposed so LoginWindow
     // QML can wire `webEngineView.profile = cookieJar.profile`.
@@ -40,6 +47,7 @@ public:
     ~CookieJar() override;
 
     bool youtubeLoggedIn() const { return m_youtubeLoggedIn; }
+    int  trackedCookieCount() const { return m_trackedCookieCount; }
     QWebEngineProfile *profile() const { return m_profile; }
 
     // Writes the YouTube/Google cookies of this profile into a
@@ -54,8 +62,17 @@ public:
     // profile.  Used by the "Sign out of YouTube" button in Settings.
     Q_INVOKABLE void signOutYouTube();
 
+    // Force a re-read of every cookie in the WebEngine cookie store.
+    // Re-emits cookieAdded for already-stored cookies; we use it on
+    // LoginWindow.close and on SettingsPage.show in case the event
+    // for the just-stored auth cookie didn't fire synchronously
+    // before the user clicked away.  Cheap (microseconds), always
+    // safe to call.
+    Q_INVOKABLE void refresh();
+
 signals:
     void youtubeLoggedInChanged();
+    void trackedCookieCountChanged();
 
 private slots:
     void onCookieAdded(const QNetworkCookie &c);
@@ -64,9 +81,10 @@ private slots:
 private:
     static bool isGoogleDomain(const QString &domain);
     static bool isAuthCookieName(const QString &name);
-    void recomputeLoginState();
+    void recomputeState();
 
     QWebEngineProfile *m_profile = nullptr;
     QList<QNetworkCookie> m_cookies;
     bool m_youtubeLoggedIn = false;
+    int  m_trackedCookieCount = 0;
 };

@@ -27,6 +27,13 @@ Window {
     visible: false
     flags: Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowMinMaxButtonsHint
 
+    // Re-sync the cookie jar with the on-disk store whenever this
+    // window closes.  Plain cookieAdded events fire as Google sets
+    // cookies during sign-in, but if the user clicked Close while
+    // the WebEngine event pump was mid-flight we'd otherwise miss
+    // the just-arrived auth cookie and report "not signed in".
+    onClosing: cookieJar.refresh()
+
     // Center over the parent window on first show — calling this every
     // openLogin() is intentional: if the user moved the main window
     // after the last sign-in, the next one re-centers correctly.
@@ -89,6 +96,16 @@ Window {
                 // — opening a separate child window would lose the
                 // visual context of the warning banner.
                 request.openIn(web)
+            }
+
+            // Every time a page settles we ask the cookie jar to
+            // re-sync — cheap, idempotent, and guarantees that the
+            // status footer / Settings pill below reflect any auth
+            // cookies Google just set on this navigation.
+            onLoadingChanged: function(loadRequest) {
+                if (loadRequest.status === WebEngineView.LoadSucceededStatus) {
+                    cookieJar.refresh()
+                }
             }
         }
 

@@ -355,6 +355,10 @@ Item {
             AcrylicCard {
                 Layout.fillWidth: true
                 Layout.preferredHeight: signInGrid.implicitHeight + 24
+                // Refresh the cookie jar whenever the user opens the
+                // Settings page — picks up any login state that might
+                // have settled after a previous LoginWindow closed.
+                Component.onCompleted: if (typeof cookieJar !== 'undefined') cookieJar.refresh()
                 ColumnLayout {
                     id: signInGrid
                     anchors.fill: parent
@@ -437,6 +441,24 @@ Item {
                             }
                             Item { Layout.fillWidth: true }
                         }
+                    }
+
+                    // Diagnostic counter — shows how many cookies the
+                    // jar actually tracks for Google/YouTube domains.
+                    // Useful when the login-state heuristic disagrees
+                    // with what the user just did inside LoginWindow:
+                    // a non-zero count here means cookies are stored,
+                    // we just didn't recognise an auth one yet.
+                    Text {
+                        Layout.fillWidth: true
+                        visible: cookieJar.trackedCookieCount > 0
+                        text: i18n.t("signin.cookieCount")
+                              .replace("%1", cookieJar.trackedCookieCount)
+                        color: theme.textSecondary
+                        opacity: 0.65
+                        font.pixelSize: 11
+                        font.family: "Inter, Segoe UI, sans-serif"
+                        wrapMode: Text.WordWrap
                     }
 
                     Text {

@@ -287,6 +287,8 @@ void Locale::buildTable()
                                          "Підключено — це вікно можна закрити.");
     put(T, "signin.window.notyet",      "Log in with your secondary Google account.",
                                          "Увійди вторинним акаунтом Google.");
+    put(T, "signin.cookieCount",        "%1 Google / YouTube cookies stored.",
+                                         "Збережено %1 cookies Google / YouTube.");
 
     put(T, "set.ytDlpPath",      "Path to yt-dlp",             "Шлях до yt-dlp");
     put(T, "set.ffmpegPath",     "Path to ffmpeg",             "Шлях до ffmpeg");
