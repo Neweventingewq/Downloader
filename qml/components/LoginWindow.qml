@@ -31,7 +31,12 @@ Window {
     // openLogin() is intentional: if the user moved the main window
     // after the last sign-in, the next one re-centers correctly.
     function openLogin() {
-        const url = "https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Fwww.youtube.com%2F&service=youtube&hl=en"
+        // AccountChooser is the publicly documented, session-token-free
+        // entry into Google's sign-in flow.  Hitting v3/signin/identifier
+        // directly returns HTTP 400 because that path expects a `dsh`
+        // (display session handle) query parameter that the front-end
+        // backend would normally synthesise.
+        const url = "https://accounts.google.com/AccountChooser?service=youtube&continue=https%3A%2F%2Fwww.youtube.com%2F&hl=en"
         web.url = url
         const screen = Qt.application.screens && Qt.application.screens[0]
         if (screen) {
