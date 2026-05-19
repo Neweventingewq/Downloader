@@ -22,14 +22,29 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential ninja-build cmake pkg-config \
             libgl1-mesa-dev libglu1-mesa-dev \
+            libxkbcommon-dev libvulkan-dev \
             qt6-base-dev qt6-declarative-dev qt6-tools-dev \
             libqt6opengl6-dev libqt6openglwidgets6 \
-            qt6-webengine-dev libqt6webenginecore6 libqt6webenginequick6 \
+            qt6-webengine-dev libqt6webenginecore6 libqt6webenginecore6-bin \
+            libqt6webenginequick6 \
             qml6-module-qtwebengine qml6-module-qtwebchannel \
             qml6-module-qtquick qml6-module-qtquick-controls \
             qml6-module-qtquick-layouts qml6-module-qtquick-window \
             qml6-module-qtquick-shapes qml6-module-qtquick-dialogs \
             qml6-module-qtqml-workerscript
+
+      - name: Workaround Qt6 packaging bug
+        run: |
+          # Ubuntu 22.04's qt6-webengine-dev ships
+          # Qt6WebEngineCoreToolsTargets.cmake referencing
+          # /usr/lib/qt6/libexec/qwebengine_convert_dict but the binary
+          # isn't actually packaged — find_package(Qt6 ... WebEngineQuick)
+          # therefore fails.  An empty executable stub satisfies the
+          # CMake import without affecting anything else (the dict
+          # converter is only used by spell-check builds we don't run).
+          if [ ! -e /usr/lib/qt6/libexec/qwebengine_convert_dict ]; then
+            sudo install -m 0755 /dev/null /usr/lib/qt6/libexec/qwebengine_convert_dict
+          fi
 
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
